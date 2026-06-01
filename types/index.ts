@@ -8,6 +8,8 @@ export interface User {
 export interface BaseNote {
     id: string;
     title: string;
+    description?: string;
+    isFavorite: boolean;
     createdAt: Date;
     updateAt: Date;
 }
@@ -25,9 +27,13 @@ export interface ChecklistItem {
 export interface ChecklistNote extends BaseNote {
     items: ChecklistItem[];
 }
+
 export interface IdeaNote extends BaseNote {
     tags: string[];
     color: string;
 }
 
 export type AnyNote = Note | ChecklistNote | IdeaNote;
+
+/** Filter categories for the top bar */
+export type FilterCategory = "all" | "notes" | "ideas" | "todo";

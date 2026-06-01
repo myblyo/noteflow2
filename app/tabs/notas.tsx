@@ -2,41 +2,69 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useNotesStore } from "../../store/noteStore";
+import { useThemeColors } from "../../hooks/useTheme";
+import { spacing, radius, typography } from "../../constants/theme";
 import type { Note } from "../../types";
 
 export default function NotasScreen() {
   const notes = useNotesStore((state) => state.notes);
+  const colors = useThemeColors();
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      <Text style={styles.header}>Notas</Text>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={["top", "left", "right"]}
+    >
+      <Text style={[styles.header, { color: colors.textPrimary }]}>Notas</Text>
 
       {notes.length === 0 ? (
-        <Text style={styles.empty}>No hay notas todavía</Text>
+        <Text style={[styles.empty, { color: colors.textSecondary }]}>
+          No hay notas todavía
+        </Text>
       ) : (
         <FlatList
           data={notes}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => <NoteCard note={item} />}
+          renderItem={({ item }) => <NoteCard note={item} colors={colors} />}
         />
       )}
     </SafeAreaView>
   );
 }
 
-function NoteCard({ note }: { note: Note }) {
+function NoteCard({
+  note,
+  colors,
+}: {
+  note: Note;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>{note.title}</Text>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.cardShadow,
+        },
+      ]}
+    >
+      <Text style={[styles.title, { color: colors.textPrimary }]}>
+        {note.title}
+      </Text>
       {note.content ? (
-        <Text style={styles.content} numberOfLines={3}>
+        <Text
+          style={[styles.content, { color: colors.textSecondary }]}
+          numberOfLines={3}
+        >
           {note.content}
         </Text>
       ) : null}
-      <Text style={styles.date}>
-        {note.createdAt.toLocaleDateString()} ·{" "}
-        {note.updateAt.toLocaleDateString()}
+      <Text style={[styles.date, { color: colors.textTertiary }]}>
+        {new Date(note.createdAt).toLocaleDateString()} ·{" "}
+        {new Date(note.updateAt).toLocaleDateString()}
       </Text>
     </View>
   );
@@ -45,48 +73,37 @@ function NoteCard({ note }: { note: Note }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
   },
   header: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#111",
-    marginTop: 8,
-    marginBottom: 16,
+    ...typography.h1,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   empty: {
-    fontSize: 16,
-    color: "#6b7280",
+    ...typography.body,
     textAlign: "center",
-    marginTop: 32,
+    marginTop: spacing.xl,
   },
   list: {
-    paddingBottom: 24,
-    gap: 12,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
   },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
   },
   title: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
-    marginBottom: 6,
+    ...typography.h3,
+    marginBottom: spacing.xs + 2,
   },
   content: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 22,
-    marginBottom: 8,
+    ...typography.body,
+    marginBottom: spacing.sm,
   },
   date: {
-    fontSize: 12,
-    color: "#9ca3af",
+    ...typography.caption,
   },
 });
