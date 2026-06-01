@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useNotesStore } from "../../store/noteStore";
-import { useThemeColors } from "../../hooks/useTheme";
-import { spacing, radius, typography } from "../../constants/theme";
+import { useNotesStore } from "../../../store/noteStore";
+import { useThemeColors } from "../../../hooks/useTheme";
+import { spacing, radius, typography } from "../../../constants/theme";
 
 export default function IdeasScreen() {
   const ideas = useNotesStore((state) => state.ideas);

@@ -36,7 +36,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="checklists"
+        name="checklist"
         options={{
           title: "Checklists",
           tabBarIcon: ({ color, size }) => (
