@@ -8,10 +8,9 @@ export interface User {
 export interface BaseNote {
     id: string;
     title: string;
-    description?: string;
     isFavorite: boolean;
     createdAt: Date;
-    updateAt: Date;
+    updatedAt: Date;
 }
 
 export interface Note extends BaseNote {
@@ -29,11 +28,28 @@ export interface ChecklistNote extends BaseNote {
 }
 
 export interface IdeaNote extends BaseNote {
+    description: string;
     tags: string[];
     color: string;
 }
 
+/** Union AnyNote */
 export type AnyNote = Note | ChecklistNote | IdeaNote;
 
+
+/** Implementar guardas para cada tipo de nota*/
+export function isNote(note: AnyNote): note is Note {
+    return "content" in note;
+}
+
+export function isChecklistNote(note: AnyNote): note is ChecklistNote {
+    return "items" in note;
+}
+
+export function isIdeaNote(note: AnyNote): note is IdeaNote {
+    return "tags" in note && "color" in note;
+}
+
 /** Filter categories for the top bar */
-export type FilterCategory = "all" | "notes" | "ideas" | "todo";
+export type NoteType = "all" | "notes" | "ideas" | "todo";
+

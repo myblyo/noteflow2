@@ -11,12 +11,31 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
+        tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: colors.tabBar,
-          borderTopColor: colors.tabBarBorder,
+          backgroundColor: colors.surface,
+          borderTopWidth: 0,
+          marginHorizontal: "10%",
+          marginBottom: 24,
+          height: 64,
+          borderRadius: 32,
+          elevation: 10,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.1,
+          shadowRadius: 20,
         },
       }}
     >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "All",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="grid-outline" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="notas"
         options={{
@@ -27,29 +46,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="nueva-nota"
-        options={{
-          title: "Nueva",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="checklist"
-        options={{
-          title: "Checklists",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="checkbox-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="idea"
+        name="ideas"
         options={{
           title: "Ideas",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bulb-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="todo"
+        options={{
+          title: "To Do",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="checkbox-outline" size={size} color={color} />
           ),
         }}
       />
