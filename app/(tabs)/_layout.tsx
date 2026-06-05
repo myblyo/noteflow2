@@ -1,12 +1,20 @@
+import { View } from "react-native";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeColors } from "../../hooks/useTheme";
+import { SearchBar } from "../../components/SearchBar";
 
 export default function TabsLayout() {
   const colors = useThemeColors();
 
   return (
-    <Tabs
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+      <View style={{ paddingTop: 8 }}>
+        <SearchBar />
+      </View>
+      <View style={{ flex: 1 }}>
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.tabActive,
@@ -64,5 +72,7 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+      </View>
+    </SafeAreaView>
   );
 }

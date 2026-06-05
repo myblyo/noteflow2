@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -10,11 +10,18 @@ import { spacing } from "../../constants/theme";
 import { sharedStyles } from "../../constants/sharedStyles";
 import { FlashList } from "@shopify/flash-list";
 import { ChecklistNote } from "../../types";
+import { filterChecklists } from "../../utils/filterItems";
 
 export default function TodoScreen() {
   const colors = useThemeColors();
   const store = useNotesStore();
   const router = useRouter();
+  const searchQuery = useNotesStore((s) => s.searchQuery);
+
+  const filteredChecklists = useMemo(
+    () => filterChecklists(store.checklists, searchQuery),
+    [store.checklists, searchQuery],
+  );
 
   const renderTodoRow = (checklistId: string, item: any) => (
     <Pressable
@@ -70,7 +77,7 @@ export default function TodoScreen() {
   return (
     <SafeAreaView
       style={[sharedStyles.root, { backgroundColor: colors.background }]}
-      edges={["top", "left", "right"]}
+      edges={["left", "right"]}
     >
       <View style={sharedStyles.body}>
         <View
@@ -102,12 +109,21 @@ export default function TodoScreen() {
           >
             <Ionicons name="add" size={24} color={colors.textPrimary} />
           </Pressable>
-          <FlashList
-            data={store.checklists}
-            renderItem={renderChecklist}
-            keyExtractor={(item) => item.id}
-            estimatedItemSize={120}
-          />
+          {filteredChecklists.length === 0 ? (
+            <View style={{ alignItems: "center", paddingVertical: spacing.xl }}>
+              <Text style={[sharedStyles.bodyText, { color: colors.textSecondary }]}>
+                {searchQuery.trim()
+                  ? "No hay tareas que coincidan con tu búsqueda"
+                  : "No hay tareas todavía"}
+              </Text>
+            </View>
+          ) : (
+            <FlashList
+              data={filteredChecklists}
+              renderItem={renderChecklist}
+              keyExtractor={(item) => item.id}
+            />
+          )}
         </View>
       </View>
     </SafeAreaView>
