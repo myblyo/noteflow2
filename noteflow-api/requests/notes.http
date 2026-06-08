@@ -1,0 +1,71 @@
+@baseUrl = http://localhost:3000/api/notes
+@noteId = reemplazar-con-id-real
+
+### GET — listar notas
+GET {{baseUrl}}
+
+### POST — crear nota con tags e items
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "title": "Checklist de prueba",
+  "type": "checklist",
+  "content": "Tareas del sprint",
+  "color": "#6366F1",
+  "tags": ["backend", "api"],
+  "items": [
+    { "task": "Implementar GET por id", "is_completed": true },
+    { "task": "Documentar respuestas", "is_completed": false }
+  ]
+}
+
+### GET — nota por id
+GET {{baseUrl}}/{{noteId}}
+
+### PATCH — actualizar nota
+PATCH {{baseUrl}}/{{noteId}}
+Content-Type: application/json
+
+{
+  "title": "Checklist actualizada",
+  "is_favorite": true,
+  "tags": ["backend", "docs"],
+  "items": [
+    { "task": "Implementar GET por id", "is_completed": true },
+    { "task": "Documentar respuestas", "is_completed": true }
+  ]
+}
+
+### DELETE — borrar nota (204 sin body)
+DELETE {{baseUrl}}/{{noteId}}
+
+### GET — checklist items de una nota
+GET {{baseUrl}}/{{noteId}}/checklist-items
+
+### POST — añadir checklist item
+POST {{baseUrl}}/{{noteId}}/checklist-items
+Content-Type: application/json
+
+{
+  "task": "Primera tarea"
+}
+
+@itemId = reemplazar-con-item-id-real
+
+### PATCH — toggle completado (sin body)
+PATCH http://localhost:3000/api/checklist-items/{{itemId}}
+
+### PATCH — fijar completado
+PATCH http://localhost:3000/api/checklist-items/{{itemId}}
+Content-Type: application/json
+
+{
+  "is_completed": true
+}
+
+### DELETE — eliminar checklist item (204 sin body)
+DELETE http://localhost:3000/api/checklist-items/{{itemId}}
+
+### GET — nota inexistente (404)
+GET {{baseUrl}}/00000000-0000-0000-0000-000000000000

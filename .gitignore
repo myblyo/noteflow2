@@ -31,7 +31,12 @@ yarn-error.*
 *.pem
 
 # local env files
+.env.local
 .env*.local
+server/.env
+
+# API runtime data (seed is auto-created)
+server/data/db.json
 
 # typescript
 *.tsbuildinfo

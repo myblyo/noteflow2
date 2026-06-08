@@ -1,21 +1,36 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ModalShell } from "../../components/ModalShell";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { BackButton } from "../../components/BackButton";
+import { DETAIL_FALLBACKS } from "../../utils/routes";
+import { goBack } from "../../utils/navigation";
 
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
 
 import { Alert } from "react-native";
-import { useHaptics } from "../../hooks/useHaptics"
+import { useHaptics } from "../../hooks/useHaptics";
+import { FavoriteStarButton } from "../../components/FavoriteStarButton";
+import { formatDate } from "../../utils/formatDate";
+import { useResponsive } from "../../hooks/useResponsive";
+import { PageTransition } from "../../components/PageTransition";
 
 export default function NotaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useThemeColors();
+  const { isMobile, isLargeScreen, isXL, isWide, width } = useResponsive();
   const store = useNotesStore();
   const router = useRouter();
+
+  const chromePadding = isXL ? 56 : isLargeScreen ? 48 : isMobile ? 24 : 36;
+  const editorPadding = isXL ? 40 : isLargeScreen ? 32 : isMobile ? 16 : 24;
+  const editorMaxWidth = isXL ? 1280 : isWide ? 1120 : isLargeScreen ? 960 : isMobile ? width : 720;
+  const edgeMargin = isMobile ? spacing.lg : isLargeScreen ? 24 : spacing.md;
+  const verticalMargin = isLargeScreen ? spacing.xxl : spacing.lg;
+  const editorMinHeight = isLargeScreen ? 480 : 320;
 
   const note = store.notes.find((n) => n.id === id);
 
@@ -54,48 +69,56 @@ export default function NotaDetailScreen() {
             if (type === "note") store.deleteNote(id);
             if (type === "checklist") store.deleteChecklist(id);
             if (type === "idea") store.deleteIdea(id);
+            goBack(router, DETAIL_FALLBACKS.note);
           },
         },
       ]
     );
   };
 
-  const formatDate = (date: string | Date) =>
-    new Date(date).toLocaleDateString();
-
   if (!note) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Ionicons name="close" size={28} color={colors.textPrimary} />
-          </Pressable>
+      <PageTransition variant="stack">
+      <ModalShell
+        maxWidth={editorMaxWidth}
+        style={[
+          styles.root,
+          { marginHorizontal: edgeMargin, marginVertical: verticalMargin },
+        ]}
+      >
+        <View style={[styles.header, { paddingHorizontal: chromePadding }]}>
+          <BackButton fallback={DETAIL_FALLBACKS.note} icon="close" />
         </View>
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             Nota no encontrada
           </Text>
         </View>
-      </SafeAreaView>
+      </ModalShell>
+      </PageTransition>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+    <PageTransition variant="stack">
+    <ModalShell
+      maxWidth={editorMaxWidth}
+      style={[
+        styles.root,
+        { marginHorizontal: edgeMargin, marginVertical: verticalMargin },
+      ]}
+    >
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => { handleSave(); router.back(); }} hitSlop={8}>
-          <Ionicons name="chevron-down" size={28} color={colors.textPrimary} />
-        </Pressable>
+      <View style={[styles.header, { paddingHorizontal: chromePadding }]}>
+        <BackButton fallback={DETAIL_FALLBACKS.note} onPressBefore={handleSave} />
 
         <View style={styles.headerActions}>
-          <Pressable onPress={() => store.toggleNoteFavorite(id!)} hitSlop={8} style={styles.headerBtn}>
-            <Ionicons
-              name={note.isFavorite ? "star" : "star-outline"}
-              size={22}
-              color={note.isFavorite ? colors.accent : colors.textPrimary}
-            />
-          </Pressable>
+          <FavoriteStarButton
+            isFavorite={note.isFavorite}
+            onPress={() => store.toggleNoteFavorite(id!)}
+            size={22}
+            style={styles.headerBtn}
+          />
           <Pressable onPress={() => handleDelete(id!, "note")} hitSlop={8} style={styles.headerBtn}>
             <Ionicons name="trash-outline" size={22} color={colors.error} />
           </Pressable>
@@ -105,11 +128,21 @@ export default function NotaDetailScreen() {
       {/* Editor */}
       <ScrollView
         style={styles.editorScroll}
-        contentContainerStyle={styles.editorContainer}
+        contentContainerStyle={[
+          styles.editorContainer,
+          {
+            paddingHorizontal: editorPadding,
+            paddingBottom: spacing.xxl * 2,
+            minHeight: editorMinHeight,
+          },
+        ]}
         keyboardDismissMode="interactive"
       >
         <TextInput
-          style={[styles.titleInput, { color: colors.textPrimary }]}
+          style={[
+            styles.titleInput,
+            { color: colors.textPrimary, fontSize: isLargeScreen ? 40 : 32 },
+          ]}
           placeholder="Título..."
           placeholderTextColor={colors.textTertiary}
           value={title}
@@ -119,7 +152,15 @@ export default function NotaDetailScreen() {
           selectionColor={colors.accent}
         />
         <TextInput
-          style={[styles.contentInput, { color: colors.textPrimary }]}
+          style={[
+            styles.contentInput,
+            {
+              color: colors.textPrimary,
+              minHeight: editorMinHeight,
+              fontSize: isLargeScreen ? 19 : 17,
+              lineHeight: isLargeScreen ? 30 : 26,
+            },
+          ]}
           placeholder="Escribe aquí..."
           placeholderTextColor={colors.textTertiary}
           value={content}
@@ -133,7 +174,12 @@ export default function NotaDetailScreen() {
       </ScrollView>
 
       {/* Footer meta */}
-      <View style={[styles.footer, { borderTopColor: colors.divider }]}>
+      <View
+        style={[
+          styles.footer,
+          { borderTopColor: colors.divider, paddingHorizontal: chromePadding },
+        ]}
+      >
         <Text style={[styles.footerText, { color: colors.textTertiary }]}>
           Creada: {formatDate(note.createdAt)}
         </Text>
@@ -141,7 +187,8 @@ export default function NotaDetailScreen() {
           Editada: {formatDate(note.updatedAt)}
         </Text>
       </View>
-    </SafeAreaView>
+    </ModalShell>
+    </PageTransition>
   );
 }
 
@@ -153,8 +200,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xl,
   },
   headerActions: {
     flexDirection: "row",
@@ -168,9 +214,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   editorContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xl,
     flexGrow: 1,
+    width: "100%",
   },
   titleInput: {
     ...typography.title,
@@ -182,19 +228,16 @@ const styles = StyleSheet.create({
   },
   contentInput: {
     flex: 1,
+    width: "100%",
     ...typography.body,
-    fontSize: 17,
-    lineHeight: 26,
     borderWidth: 0,
     backgroundColor: "transparent",
     outlineStyle: "none" as any,
-    minHeight: 200,
   },
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xl,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   footerText: {

@@ -6,11 +6,16 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "api": "npm run dev --prefix server",
+    "api:start": "npm run start --prefix server",
+    "db:test": "npm run db:test --prefix server",
+    "db:migrate": "npm run db:migrate --prefix server"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.13",
     "@expo/vector-icons": "^15.0.2",
+    "@neondatabase/serverless": "^1.1.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@shopify/flash-list": "2.0.2",
     "expo": "^56.0.8",
@@ -19,6 +24,7 @@
     "expo-haptics": "~56.0.3",
     "expo-linking": "~56.0.13",
     "expo-router": "~56.2.8",
+    "expo-secure-store": "~55.0.7",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",

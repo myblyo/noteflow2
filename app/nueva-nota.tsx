@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLocalSearchParams } from "expo-router";
 import {
   View,
   Text,
@@ -8,14 +9,19 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ModalShell } from "../components/ModalShell";
+import { BackButton } from "../components/BackButton";
 import { useRouter } from "expo-router";
+import { DETAIL_FALLBACKS } from "../utils/routes";
 import { z } from "zod";
 
 import { useThemeColors } from "../hooks/useTheme";
 import { noteSchema, checklistSchema, ideaSchema } from "../types/schemas";
 import { useNotesStore } from "../store/noteStore";
-import type { Note, ChecklistNote, IdeaNote } from "../types";
+import { DEFAULT_IDEA_COLOR } from "../constants/ideaColors";
+import { IdeaColorPicker } from "../components/IdeaColorPicker";
+import { PageTransition } from "../components/PageTransition";
+import { setSlideForward } from "../utils/navigation";
 
 type NoteFormType = "note" | "checklist" | "idea";
 
@@ -25,15 +31,29 @@ const TYPES: { key: NoteFormType; label: string }[] = [
   { key: "idea", label: "Idea" },
 ];
 
+function parseNoteType(value: string | string[] | undefined): NoteFormType {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === "idea" || raw === "checklist" || raw === "note") return raw;
+  return "note";
+}
+
 export default function NuevaNotaScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const store = useNotesStore();
+  const { type: typeParam } = useLocalSearchParams<{ type?: string }>();
 
-  const [type, setType] = useState<NoteFormType>("note");
+  const [type, setType] = useState<NoteFormType>(() => parseNoteType(typeParam));
+  const backFallback =
+    type === "idea"
+      ? DETAIL_FALLBACKS.idea
+      : type === "checklist"
+        ? DETAIL_FALLBACKS.checklist
+        : DETAIL_FALLBACKS.nuevaNota;
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [description, setDescription] = useState("");
+  const [ideaColor, setIdeaColor] = useState(DEFAULT_IDEA_COLOR);
   const [errors, setErrors] = useState<{
     title?: string;
     content?: string;
@@ -44,54 +64,48 @@ export default function NuevaNotaScreen() {
     setType(newType);
     setContent("");
     setDescription("");
+    setIdeaColor(DEFAULT_IDEA_COLOR);
     setErrors({});
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
       if (type === "note") {
         const data = noteSchema.parse({ title, content });
-        const newNote: Note = {
-          id: crypto.randomUUID(),
+        const newNote = await store.addNote({
           title: data.title,
           content: data.content,
-          isFavorite: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        store.addNote(newNote);
+        });
+        setErrors({});
+        setSlideForward();
+        router.replace({ pathname: "/nota/[id]", params: { id: newNote.id } });
+        return;
       }
 
       if (type === "idea") {
         const data = ideaSchema.parse({ title, description });
-        const newIdea: IdeaNote = {
-          id: crypto.randomUUID(),
+        const newIdea = await store.addIdea({
           title: data.title,
           description: data.description ?? "",
-          color: "#6366F1",
-          tags: [],
-          isFavorite: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        store.addIdea(newIdea);
+          color: ideaColor,
+        });
+        setErrors({});
+        setSlideForward();
+        router.replace({ pathname: "/idea/[id]", params: { id: newIdea.id } });
+        return;
       }
 
       if (type === "checklist") {
         const data = checklistSchema.parse({ title });
-        const newChecklist: ChecklistNote = {
-          id: crypto.randomUUID(),
-          title: data.title,
-          items: [],
-          isFavorite: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        store.addChecklist(newChecklist);
+        const newChecklist = await store.addChecklist({ title: data.title });
+        setErrors({});
+        setSlideForward();
+        router.replace({
+          pathname: "/checklist/[id]",
+          params: { id: newChecklist.id },
+        });
+        return;
       }
-
-      setErrors({});
-      router.back();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors = error.flatten().fieldErrors as Partial<Record<string, string[]>>;
@@ -100,12 +114,17 @@ export default function NuevaNotaScreen() {
           content: fieldErrors.content?.[0] ?? "",
           description: fieldErrors.description?.[0] ?? "",
         });
+        return;
+      }
+      if (error instanceof Error) {
+        setErrors({ title: error.message });
       }
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <PageTransition variant="fade">
+    <ModalShell>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -115,6 +134,7 @@ export default function NuevaNotaScreen() {
           contentContainerStyle={{ padding: 20 }}
           keyboardShouldPersistTaps="handled"
         >
+          <BackButton fallback={backFallback} style={{ marginBottom: 16 }} />
           <Text style={{ color: colors.textPrimary, fontSize: 20, marginBottom: 20 }}>
             Nueva nota
           </Text>
@@ -225,6 +245,10 @@ export default function NuevaNotaScreen() {
               {errors.description ? (
                 <Text style={{ color: "red", fontSize: 12 }}>{errors.description}</Text>
               ) : null}
+              <IdeaColorPicker
+                selectedColor={ideaColor}
+                onSelectColor={setIdeaColor}
+              />
             </>
           )}
 
@@ -251,6 +275,7 @@ export default function NuevaNotaScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ModalShell>
+    </PageTransition>
   );
 }

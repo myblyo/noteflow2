@@ -1,55 +1,69 @@
-import React from "react";
-import { View, Text, Pressable, ScrollView, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useMemo } from "react";
+import { View, Text, Pressable, Platform } from "react-native";
 import { useRouter } from "expo-router";
+import { ResponsiveShell } from "../../components/ResponsiveShell";
+import { PageTransition } from "../../components/PageTransition";
 
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
+import { useItemSelection } from "../../hooks/useItemSelection";
 import { sharedStyles } from "../../constants/sharedStyles";
 import type { Note } from "../../types";
 import { spacing } from "../../constants/theme";
 import { FlashList } from "@shopify/flash-list";
+import { filterNotes } from "../../utils/filterItems";
+import { formatDate } from "../../utils/formatDate";
+import { noteDetailRoute, nuevaNotaRoute } from "../../utils/routes";
+import { navigateForward } from "../../utils/navigation";
+import { AddButton } from "../../components/AddButton";
+import { FavoriteStarButton } from "../../components/FavoriteStarButton";
+import { SelectionCheckbox } from "../../components/SelectionCheckbox";
 
 export default function NotasScreen() {
   const colors = useThemeColors();
   const store = useNotesStore();
   const router = useRouter();
+  const searchQuery = useNotesStore((s) => s.searchQuery);
+  const showFavoritesOnly = useNotesStore((s) => s.showFavoritesOnly);
+  const { selectionMode, isSelected, handlePress } = useItemSelection("note");
 
-  const handleAddNote = () => {
-    const newNote: Note = {
-      id: crypto.randomUUID(),
-      title: "",
-      content: "",
-      isFavorite: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    store.addNote(newNote);
-    router.push(`/nota/${newNote.id}`);
-  };
+  const filteredNotes = useMemo(
+    () => filterNotes(store.notes, searchQuery, showFavoritesOnly),
+    [store.notes, searchQuery, showFavoritesOnly],
+  );
 
   const renderNoteCard = (note: Note) => {
-    const isSelected = store.selectedNoteId === note.id;
+    const selected = isSelected(note.id);
+    const editorSelected = store.selectedNoteId === note.id;
+
     return (
       <Pressable
         key={note.id}
-        onPress={() => router.push(`/nota/${note.id}`)}
+        onPress={() =>
+          handlePress(note.id, () => navigateForward(router, noteDetailRoute(note.id)))
+        }
         style={[
           sharedStyles.listItem,
-          { backgroundColor: isSelected ? colors.surface : colors.surfaceTranslucent },
-          isSelected &&
-          Platform.select({
-            ios: {
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.05,
-              shadowRadius: 32,
-            },
-            android: { elevation: 2 },
-          }),
+          {
+            backgroundColor:
+              selected || editorSelected ? colors.surface : colors.surfaceTranslucent,
+            borderWidth: selected ? 2 : 0,
+            borderColor: selected ? colors.accent : "transparent",
+          },
+          (selected || editorSelected) &&
+            Platform.select({
+              ios: {
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.05,
+                shadowRadius: 32,
+              },
+              android: { elevation: 2 },
+            }),
         ]}
       >
+        {selectionMode && <SelectionCheckbox selected={selected} />}
+
         <View style={sharedStyles.listItemContent}>
           <Text
             style={[sharedStyles.subtitleText, { color: colors.textPrimary }]}
@@ -66,34 +80,36 @@ export default function NotasScreen() {
         </View>
 
         <View style={sharedStyles.noteCardRight}>
-          <View style={[sharedStyles.datePill, { backgroundColor: colors.surfaceSecondary }]}>
-            <Text style={[sharedStyles.dateText, { color: colors.textPrimary }]}>
-              {note.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-            </Text>
-          </View>
-          <Pressable onPress={() => store.toggleNoteFavorite(note.id)} hitSlop={8}>
-            <Ionicons
-              name={note.isFavorite ? "star" : "star-outline"}
-              size={20}
-              color={colors.textPrimary}
+          {!selectionMode && (
+            <View style={[sharedStyles.datePill, { backgroundColor: colors.surfaceSecondary }]}>
+              <Text style={[sharedStyles.dateText, { color: colors.textPrimary }]}>
+                {formatDate(note.createdAt, "en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </Text>
+            </View>
+          )}
+          {!selectionMode && (
+            <FavoriteStarButton
+              isFavorite={note.isFavorite}
+              onPress={() => store.toggleNoteFavorite(note.id)}
             />
-          </Pressable>
+          )}
         </View>
       </Pressable>
     );
   };
 
   return (
-    <SafeAreaView
-      style={[sharedStyles.root, { backgroundColor: colors.background }]}
-      edges={["top", "left", "right"]}
-    >
-      <View style={sharedStyles.body}>
+    <PageTransition variant="tab" routeKey="notas">
+      <ResponsiveShell>
         <View
           style={[
             sharedStyles.listContainer,
             sharedStyles.fullWidthPanel,
-            { backgroundColor: colors.surfaceSecondary },
+            { backgroundColor: colors.surfaceSecondary, flex: 1 },
           ]}
         >
           <View style={sharedStyles.panelHeader}>
@@ -101,19 +117,30 @@ export default function NotasScreen() {
               Notas
             </Text>
           </View>
-          <Pressable onPress={handleAddNote} style={sharedStyles.addButton}>
-            <Ionicons name="add" size={24} color={colors.textPrimary} />
-          </Pressable>
-          <FlashList
-            data={store.notes}
-            renderItem={({ item }) => renderNoteCard(item)}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            estimatedItemSize={100}
-            contentContainerStyle={{ paddingBottom: spacing.md, paddingTop: spacing.md }}
-          />
+          {!selectionMode && (
+            <AddButton onPress={() => navigateForward(router, nuevaNotaRoute())} />
+          )}
+          {filteredNotes.length === 0 ? (
+            <View style={{ alignItems: "center", paddingVertical: spacing.xl }}>
+              <Text style={[sharedStyles.bodyText, { color: colors.textSecondary }]}>
+                {showFavoritesOnly
+                  ? "No hay notas favoritas"
+                  : searchQuery.trim()
+                    ? "No hay notas que coincidan con tu búsqueda"
+                    : "No hay notas todavía"}
+              </Text>
+            </View>
+          ) : (
+            <FlashList
+              data={filteredNotes}
+              renderItem={({ item }) => renderNoteCard(item)}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: spacing.md, paddingTop: spacing.md }}
+            />
+          )}
         </View>
-      </View>
-    </SafeAreaView>
+      </ResponsiveShell>
+    </PageTransition>
   );
 }

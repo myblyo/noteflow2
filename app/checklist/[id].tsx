@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ModalShell } from "../../components/ModalShell";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { BackButton } from "../../components/BackButton";
+import { DETAIL_FALLBACKS } from "../../utils/routes";
+import { goBack } from "../../utils/navigation";
 
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
 import { sharedStyles } from "../../constants/sharedStyles";
+import { ChecklistProgressBar } from "../../components/ChecklistProgressBar";
+import { getChecklistProgress } from "../../utils/checklistProgress";
+import { PageTransition } from "../../components/PageTransition";
 
 export default function ChecklistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,51 +37,43 @@ export default function ChecklistDetailScreen() {
     store.updateChecklist(id, { title: title.trim() });
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!id || !checklist || !newTaskText.trim()) return;
-    const newItem = {
-      id: crypto.randomUUID(),
-      task: newTaskText.trim(),
-      isCompleted: false,
-    };
-    store.updateChecklist(id, { items: [...checklist.items, newItem] });
+    await store.addChecklistItem(id, newTaskText.trim());
     setNewTaskText("");
   };
 
   const handleDelete = () => {
     if (!id) return;
     store.deleteChecklist(id);
-    router.back();
+    goBack(router, DETAIL_FALLBACKS.checklist);
   };
 
   if (!checklist) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+      <PageTransition variant="stack">
+      <ModalShell style={styles.root}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Ionicons name="close" size={28} color={colors.textPrimary} />
-          </Pressable>
+          <BackButton fallback={DETAIL_FALLBACKS.checklist} icon="close" />
         </View>
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             Checklist no encontrado
           </Text>
         </View>
-      </SafeAreaView>
+      </ModalShell>
+      </PageTransition>
     );
   }
 
-  const completedCount = checklist.items.filter((i) => i.isCompleted).length;
-  const totalCount = checklist.items.length;
-  const progress = totalCount > 0 ? completedCount / totalCount : 0;
+  const { completed, total } = getChecklistProgress(checklist.items);
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+    <PageTransition variant="stack">
+    <ModalShell style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => { handleSaveTitle(); router.back(); }} hitSlop={8}>
-          <Ionicons name="chevron-down" size={28} color={colors.textPrimary} />
-        </Pressable>
+        <BackButton fallback={DETAIL_FALLBACKS.checklist} onPressBefore={handleSaveTitle} />
 
         <TextInput
           style={[styles.headerTitle, { color: colors.textPrimary }]}
@@ -93,21 +91,10 @@ export default function ChecklistDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Progress bar */}
       <View style={[styles.progressContainer, { paddingHorizontal: spacing.xl }]}>
-        <View style={[styles.progressTrack, { backgroundColor: colors.surfaceSecondary }]}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: colors.accent,
-                width: `${progress * 100}%`,
-              },
-            ]}
-          />
-        </View>
+        <ChecklistProgressBar items={checklist.items} showLabel={false} />
         <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-          {completedCount}/{totalCount} completados
+          {completed}/{total} completados
         </Text>
       </View>
 
@@ -169,13 +156,14 @@ export default function ChecklistDetailScreen() {
       {/* Footer */}
       <View style={[styles.footer, { borderTopColor: colors.divider }]}>
         <Text style={[styles.footerText, { color: colors.textTertiary }]}>
-          Creada: {checklist.createdAt.toLocaleDateString()}
+          Creada: {new Date(checklist.createdAt).toLocaleDateString()}
         </Text>
         <Text style={[styles.footerText, { color: colors.textTertiary }]}>
-          Editada: {checklist.updatedAt.toLocaleDateString()}
+          Editada: {new Date(checklist.updatedAt).toLocaleDateString()}
         </Text>
       </View>
-    </SafeAreaView>
+    </ModalShell>
+    </PageTransition>
   );
 }
 
@@ -199,16 +187,7 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     marginBottom: spacing.lg,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: "hidden",
-    marginBottom: spacing.sm,
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 3,
+    gap: spacing.sm,
   },
   progressText: {
     ...typography.caption,

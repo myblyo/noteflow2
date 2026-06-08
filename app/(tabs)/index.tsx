@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,10 +14,26 @@ import { useRouter } from "expo-router";
 
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
-import { useSeedData } from "../../hooks/useSeedData";
 import { spacing, radius, typography } from "../../constants/theme";
 import { sharedStyles } from "../../constants/sharedStyles";
-import type { NoteType, Note, IdeaNote } from "../../types";
+import type { Note, IdeaNote } from "../../types";
+import { filterNotes, filterIdeas, filterChecklists } from "../../utils/filterItems";
+import {
+  ideaDetailRoute,
+  checklistDetailRoute,
+  nuevaNotaRoute,
+} from "../../utils/routes";
+import { navigateForward } from "../../utils/navigation";
+import { IdeaListLeading } from "../../components/IdeaListLeading";
+import { AddButton } from "../../components/AddButton";
+import { ChecklistTitleRow } from "../../components/ChecklistTitleRow";
+import { FavoriteStarButton } from "../../components/FavoriteStarButton";
+import { SelectionCheckbox } from "../../components/SelectionCheckbox";
+import { useItemSelection } from "../../hooks/useItemSelection";
+import { useResponsive } from "../../hooks/useResponsive";
+import { MobileDrawer } from "../../components/MobileDrawer";
+import type { ChecklistNote } from "../../types";
+import { PageTransition } from "../../components/PageTransition";
 
 
 
@@ -28,10 +44,49 @@ export default function DashboardScreen() {
   const store = useNotesStore();
   const router = useRouter();
 
-  // Seed data on first mount
-  useSeedData();
+  const searchQuery = useNotesStore((s) => s.searchQuery);
+  const showFavoritesOnly = useNotesStore((s) => s.showFavoritesOnly);
+  const selectionMode = useNotesStore((s) => s.selectionMode);
+  const noteSelection = useItemSelection("note");
+  const ideaSelection = useItemSelection("idea");
+  const checklistSelection = useItemSelection("checklist");
+  const {
+    isMobile,
+    isTablet,
+    isLargeScreen,
+    dashboardBody,
+    dashboardGap,
+    sidePanelWidth,
+    editorTitleSize,
+    editorBodySize,
+    centerPanelMinHeight,
+    centerPanelPadding,
+    listContainerFlex,
+  } = useResponsive();
   const [editorTitle, setEditorTitle] = useState("");
   const [editorContent, setEditorContent] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const filteredNotes = useMemo(
+    () => filterNotes(store.notes, searchQuery, showFavoritesOnly),
+    [store.notes, searchQuery, showFavoritesOnly],
+  );
+  const filteredIdeas = useMemo(
+    () => filterIdeas(store.ideas, searchQuery, showFavoritesOnly),
+    [store.ideas, searchQuery, showFavoritesOnly],
+  );
+  const filteredChecklists = useMemo(
+    () => filterChecklists(store.checklists, searchQuery, showFavoritesOnly),
+    [store.checklists, searchQuery, showFavoritesOnly],
+  );
+
+  const emptyLabel = (type: "notas" | "ideas" | "tareas") => {
+    if (showFavoritesOnly) return "Sin favoritos";
+    if (searchQuery.trim()) return "Sin coincidencias";
+    if (type === "notas") return "No hay notas";
+    if (type === "ideas") return "No hay ideas";
+    return "No hay tareas";
+  };
 
   const selectedNote = store.notes.find((n) => n.id === store.selectedNoteId);
   useEffect(() => {
@@ -44,46 +99,52 @@ export default function DashboardScreen() {
     }
   }, [store.selectedNoteId]);
 
-  const handleSaveEditor = () => {
+  useEffect(() => {
+    if (isMobile && store.selectedNoteId) {
+      setDrawerOpen(false);
+    }
+  }, [store.selectedNoteId, isMobile]);
+
+  const handleSaveEditor = async () => {
     if (store.selectedNoteId) {
-      store.updateNote(store.selectedNoteId, {
+      await store.updateNote(store.selectedNoteId, {
         title: editorTitle,
         content: editorContent,
       });
     } else if (editorTitle.trim()) {
-      const newNote: Note = {
-        id: crypto.randomUUID(),
+      const newNote = await store.addNote({
         title: editorTitle.trim(),
         content: editorContent.trim(),
-        isFavorite: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      store.addNote(newNote);
+      });
       store.setSelectedNoteId(newNote.id);
     }
   };
 
   const handleAddNote = () => {
-    store.setSelectedNoteId(null);
-    setEditorTitle("");
-    setEditorContent("");
+    navigateForward(router, nuevaNotaRoute());
   };
 
   // ─── Helper renderers ───────────────────────────────────────
 
-  const renderNoteCard = (note: Note, isFullWidth = false) => {
-    const isSelected = store.selectedNoteId === note.id;
+  const renderNoteCard = (note: Note) => {
+    const deleteSelected = noteSelection.isSelected(note.id);
+    const editorSelected = store.selectedNoteId === note.id;
+    const highlighted = deleteSelected || editorSelected;
+
     return (
       <Pressable
         key={note.id}
-        onPress={() => {
-          store.setSelectedNoteId(note.id);
-        }}
+        onPress={() =>
+          noteSelection.handlePress(note.id, () => store.setSelectedNoteId(note.id))
+        }
         style={[
           sharedStyles.listItem,
-          { backgroundColor: isSelected ? colors.surface : colors.surfaceTranslucent },
-          isSelected && Platform.select({
+          {
+            backgroundColor: highlighted ? colors.surface : colors.surfaceTranslucent,
+            borderWidth: deleteSelected ? 2 : 0,
+            borderColor: deleteSelected ? colors.accent : "transparent",
+          },
+          highlighted && Platform.select({
             ios: {
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 8 },
@@ -94,6 +155,7 @@ export default function DashboardScreen() {
           }),
         ]}
       >
+        {selectionMode && <SelectionCheckbox selected={deleteSelected} />}
         <View style={sharedStyles.listItemContent}>
           <Text style={[sharedStyles.subtitleText, { color: colors.textPrimary }]} numberOfLines={1}>
             {note.title || "Sin título"}
@@ -103,25 +165,12 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        <View style={sharedStyles.noteCardRight}>
-          {isFullWidth && (
-            <>
-              <View style={[sharedStyles.datePill, { backgroundColor: colors.surfaceSecondary }]}>
-                <Text style={[sharedStyles.dateText, { color: colors.textPrimary }]}>Apr 1, 2025</Text>
-              </View>
-              <View style={[sharedStyles.datePill, { backgroundColor: colors.surfaceSecondary }]}>
-                <Text style={[sharedStyles.dateText, { color: colors.textPrimary }]}>9:41 AM</Text>
-              </View>
-            </>
-          )}
-          <Pressable onPress={() => store.toggleNoteFavorite(note.id)} hitSlop={8}>
-            <Ionicons
-              name={note.isFavorite ? "star" : "star-outline"}
-              size={20}
-              color={colors.textPrimary}
-            />
-          </Pressable>
-        </View>
+        {!selectionMode && (
+          <FavoriteStarButton
+            isFavorite={note.isFavorite}
+            onPress={() => store.toggleNoteFavorite(note.id)}
+          />
+        )}
       </Pressable>
     );
   };
@@ -147,184 +196,332 @@ export default function DashboardScreen() {
     </Pressable>
   );
 
-  const renderIdeaRow = (idea: IdeaNote) => (
-    <Pressable
-      key={idea.id}
-      style={[sharedStyles.listItem, { backgroundColor: colors.surfaceTranslucent }]}
-      onPress={() => router.push(`/idea/${idea.id}`)}
-    >
-      <Ionicons name="caret-forward" size={14} color={colors.textPrimary} />
-      <View style={[sharedStyles.listItemContent, { marginLeft: spacing.sm }]}>
-        <Text style={[sharedStyles.subtitleText, { color: colors.textPrimary }]} numberOfLines={1}>
-          {idea.title || "Sin título"}
-        </Text>
-        <Text style={[sharedStyles.bodyText, { color: colors.textSecondary }]} numberOfLines={1}>
-          {idea.description || "Description"}
-        </Text>
-      </View>
-      <Pressable onPress={() => store.toggleIdeaFavorite(idea.id)} hitSlop={8}>
-        <Ionicons
-          name={idea.isFavorite ? "star" : "star-outline"}
-          size={20}
-          color={colors.textPrimary}
-        />
+  const renderIdeaRow = (idea: IdeaNote) => {
+    const selected = ideaSelection.isSelected(idea.id);
+
+    return (
+      <Pressable
+        key={idea.id}
+        style={[
+          sharedStyles.listItem,
+          {
+            backgroundColor: selected ? colors.surface : colors.surfaceTranslucent,
+            borderWidth: selected ? 2 : 0,
+            borderColor: selected ? colors.accent : "transparent",
+          },
+        ]}
+        onPress={() =>
+          ideaSelection.handlePress(idea.id, () => {
+            navigateForward(router, ideaDetailRoute(idea.id));
+            if (isMobile) setDrawerOpen(false);
+          })
+        }
+      >
+        {selectionMode ? (
+          <SelectionCheckbox selected={selected} />
+        ) : (
+          <IdeaListLeading color={idea.color} />
+        )}
+        <View style={[sharedStyles.listItemContent, { marginLeft: spacing.sm }]}>
+          <Text style={[sharedStyles.subtitleText, { color: colors.textPrimary }]} numberOfLines={1}>
+            {idea.title || "Sin título"}
+          </Text>
+          <Text style={[sharedStyles.bodyText, { color: colors.textSecondary }]} numberOfLines={1}>
+            {idea.description || "Description"}
+          </Text>
+        </View>
+        {!selectionMode && (
+          <FavoriteStarButton
+            isFavorite={idea.isFavorite}
+            onPress={() => store.toggleIdeaFavorite(idea.id)}
+          />
+        )}
       </Pressable>
-    </Pressable>
+    );
+  };
+
+  const renderChecklistBlock = (checklist: ChecklistNote) => {
+    const selected = checklistSelection.isSelected(checklist.id);
+
+    return (
+      <Pressable
+        key={checklist.id}
+        onPress={() =>
+          checklistSelection.handlePress(checklist.id, () => {
+            navigateForward(router, checklistDetailRoute(checklist.id));
+            if (isMobile) setDrawerOpen(false);
+          })
+        }
+        style={[
+          { marginBottom: spacing.md },
+          selected && {
+            borderWidth: 2,
+            borderColor: colors.accent,
+            borderRadius: 12,
+            padding: spacing.sm,
+          },
+        ]}
+      >
+        {selectionMode ? (
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
+            <SelectionCheckbox selected={selected} />
+            <Text
+              style={[sharedStyles.subtitleText, { color: colors.accent, flex: 1, marginBottom: 0 }]}
+              numberOfLines={1}
+            >
+              {checklist.title || "Checklist sin título"}
+            </Text>
+          </View>
+        ) : (
+          <ChecklistTitleRow checklist={checklist} />
+        )}
+        {!selectionMode &&
+          checklist.items.map((item) => renderTodoRow(checklist.id, item))}
+      </Pressable>
+    );
+  };
+
+  const panelStyle = (width?: number) => [
+    sharedStyles.listContainer,
+    isMobile ? { width: "100%" as const } : listContainerFlex,
+    width != null ? { width, maxWidth: width } : { width: "100%" as const },
+    { backgroundColor: colors.surfaceSecondary },
+  ];
+
+  const notesPanel = (
+    <View style={panelStyle(isMobile ? undefined : sidePanelWidth)}>
+      <View style={sharedStyles.panelHeader}>
+        <Text style={[sharedStyles.titleText, { color: colors.textSecondary }]}>Note list</Text>
+      </View>
+      {!selectionMode && <AddButton onPress={handleAddNote} />}
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+        {filteredNotes.length === 0 ? (
+          <Text style={[sharedStyles.bodyText, { color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.md }]}>
+            {emptyLabel("notas")}
+          </Text>
+        ) : (
+          filteredNotes.map((n) => renderNoteCard(n))
+        )}
+      </ScrollView>
+    </View>
   );
 
-  // ─── Render ─────────────────────────────────────────────────
+  const editorPanel = (
+    <View
+      style={[
+        styles.centerPanel,
+        {
+          flex: 1,
+          minHeight: isMobile ? undefined : centerPanelMinHeight,
+          paddingHorizontal: centerPanelPadding,
+        },
+      ]}
+    >
+      <TextInput
+        style={[styles.editorTitle, { color: colors.textPrimary, fontSize: editorTitleSize }]}
+        placeholder="Add title ..."
+        placeholderTextColor={colors.textTertiary}
+        value={editorTitle}
+        onChangeText={setEditorTitle}
+        onBlur={handleSaveEditor}
+        underlineColorAndroid="transparent"
+        selectionColor={colors.accent}
+      />
+      <TextInput
+        style={[styles.editorContent, { color: colors.textPrimary, fontSize: editorBodySize, flex: 1 }]}
+        placeholder="Start writing..."
+        placeholderTextColor={colors.textTertiary}
+        value={editorContent}
+        onChangeText={setEditorContent}
+        onBlur={handleSaveEditor}
+        multiline
+        textAlignVertical="top"
+        underlineColorAndroid="transparent"
+        selectionColor={colors.accent}
+      />
+    </View>
+  );
+
+  const secondaryPanelStyle = [
+    sharedStyles.listContainer,
+    listContainerFlex,
+    styles.rightPanel,
+    { backgroundColor: colors.surfaceSecondary, width: "100%" as const },
+    !isMobile && { flex: 1 },
+  ];
+
+  const todoPanel = (
+    <View style={secondaryPanelStyle}>
+      <View style={sharedStyles.panelHeader}>
+        <Text style={[sharedStyles.titleTextCentered, { color: colors.textSecondary }]}>To Do</Text>
+        {!selectionMode && (
+          <AddButton
+            onPress={() => navigateForward(router, nuevaNotaRoute("checklist"))}
+            style={{ marginBottom: 20 }}
+          />
+        )}
+      </View>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+        {filteredChecklists.length === 0 ? (
+          <Text style={[sharedStyles.bodyText, { color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.md }]}>
+            {emptyLabel("tareas")}
+          </Text>
+        ) : (
+          filteredChecklists.map((checklist) => renderChecklistBlock(checklist))
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  const ideasPanel = (
+    <View style={secondaryPanelStyle}>
+      <View style={sharedStyles.panelHeader}>
+        <Text style={[sharedStyles.titleTextCentered, { color: colors.textSecondary }]}>Ideas</Text>
+        {!selectionMode && (
+          <AddButton
+            onPress={() => navigateForward(router, nuevaNotaRoute("idea"))}
+            style={{ marginBottom: 20 }}
+          />
+        )}
+      </View>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+        {filteredIdeas.length === 0 ? (
+          <Text style={[sharedStyles.bodyText, { color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.md }]}>
+            {emptyLabel("ideas")}
+          </Text>
+        ) : (
+          filteredIdeas.map((idea) => renderIdeaRow(idea))
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  const sidePanels = (
+    <View
+      style={[
+        isMobile
+          ? { width: "100%", gap: spacing.md }
+          : isTablet
+            ? { width: "100%", flexDirection: "row", gap: dashboardGap, minHeight: 320 }
+            : { width: sidePanelWidth, gap: dashboardGap },
+        isLargeScreen && [styles.rightColumn, { width: sidePanelWidth }],
+      ]}
+    >
+      {todoPanel}
+      {ideasPanel}
+    </View>
+  );
+
+  const desktopLayout = (
+    <View style={[dashboardBody, { flexDirection: "row" }]}>
+      {notesPanel}
+      {editorPanel}
+      {sidePanels}
+    </View>
+  );
+
+  const tabletLayout = (
+    <View style={[dashboardBody, { flexDirection: "column" }]}>
+      <View style={{ flexDirection: "row", gap: dashboardGap, flex: 1, minHeight: 360 }}>
+        {notesPanel}
+        {editorPanel}
+      </View>
+      {sidePanels}
+    </View>
+  );
+
+  const drawerContent = (
+    <>
+      {notesPanel}
+      <View style={{ height: spacing.lg }} />
+      {sidePanels}
+    </>
+  );
+
+  const mobileLayout = (
+    <View style={[dashboardBody, { flexDirection: "column", flex: 1 }]}>
+      <View style={styles.mobileHeader}>
+        <Pressable
+          onPress={() => setDrawerOpen(true)}
+          hitSlop={12}
+          style={styles.menuButton}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir menú"
+        >
+          <Ionicons name="menu" size={26} color={colors.textPrimary} />
+        </Pressable>
+        <Text
+          style={[styles.mobileHeaderTitle, { color: colors.textSecondary }]}
+          numberOfLines={1}
+        >
+          {selectedNote?.title || "Nueva nota"}
+        </Text>
+        {!selectionMode && (
+          <Pressable onPress={handleAddNote} hitSlop={8}>
+            <Ionicons name="add" size={26} color={colors.textPrimary} />
+          </Pressable>
+        )}
+      </View>
+      {editorPanel}
+      <MobileDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        {drawerContent}
+      </MobileDrawer>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={[sharedStyles.root, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
-      {/* ─── Body ─── */}
-      <View style={[sharedStyles.body, { paddingTop: 24 }]}>
-        {/* ── Dashboard (All) Layout ── */}
-        <View style={[sharedStyles.listContainer, styles.leftPanel, { backgroundColor: colors.surfaceSecondary }]}>
-          <View style={sharedStyles.panelHeader}>
-            <Text style={[sharedStyles.titleText, { color: colors.textSecondary }]}>Note list</Text>
-          </View>
-          <Pressable onPress={handleAddNote} style={sharedStyles.addButton}>
-            <Ionicons name="add" size={24} color={colors.textPrimary} />
-          </Pressable>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {store.notes.map((n) => renderNoteCard(n, false))}
-          </ScrollView>
-        </View>
-
-        <View style={[styles.centerPanel]}>
-          <TextInput
-            style={[styles.editorTitle, { color: colors.textPrimary }]}
-            placeholder="Add title ..."
-            placeholderTextColor={colors.textTertiary}
-            value={editorTitle}
-            onChangeText={setEditorTitle}
-            onBlur={handleSaveEditor}
-            underlineColorAndroid="transparent"
-            selectionColor={colors.accent}
-          />
-          <TextInput
-            style={[styles.editorContent, { color: colors.textPrimary }]}
-            placeholder="Start writing..."
-            placeholderTextColor={colors.textTertiary}
-            value={editorContent}
-            onChangeText={setEditorContent}
-            onBlur={handleSaveEditor}
-            multiline
-            textAlignVertical="top"
-            underlineColorAndroid="transparent"
-            selectionColor={colors.accent}
-          />
-        </View>
-
-        <View style={styles.rightColumn}>
-          <View style={[sharedStyles.listContainer, styles.rightPanel, { backgroundColor: colors.surfaceSecondary }]}>
-            <View style={sharedStyles.panelHeader}>
-              <Text style={[sharedStyles.titleTextCentered, { color: colors.textSecondary }]}>To Do</Text>
-              <Pressable
-                onPress={() => {
-                  const newChecklist = {
-                    id: crypto.randomUUID(),
-                    title: "",
-                    isFavorite: false,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    items: [],
-                  };
-                  store.addChecklist(newChecklist);
-                  router.push(`/checklist/${newChecklist.id}`);
-                }}
-                style={{ marginBottom: 20 }}
-              >
-                <Ionicons name="add" size={24} color={colors.textPrimary} />
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {store.checklists.map((checklist) => (
-                <View key={checklist.id}>
-                  <Pressable
-                    onPress={() => router.push(`/checklist/${checklist.id}`)}
-                    style={{ marginBottom: spacing.sm }}
-                  >
-                    <Text style={[sharedStyles.subtitleText, { color: colors.accent }]}>
-                      {checklist.title || "Checklist sin título"}
-                    </Text>
-                  </Pressable>
-                  {checklist.items.map((item) => renderTodoRow(checklist.id, item))}
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          <View style={[sharedStyles.listContainer, styles.rightPanel, { backgroundColor: colors.surfaceSecondary }]}>
-            <View style={sharedStyles.panelHeader}>
-              <Text style={[sharedStyles.titleTextCentered, { color: colors.textSecondary }]}>Ideas</Text>
-              <Pressable
-                onPress={() => {
-                  const newIdea = {
-                    id: crypto.randomUUID(),
-                    title: "",
-                    description: "",
-                    tags: [],
-                    color: "#6366F1",
-                    isFavorite: false,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  };
-                  store.addIdea(newIdea);
-                  router.push(`/idea/${newIdea.id}`);
-                }}
-                style={{ marginBottom: 20 }}
-              >
-                <Ionicons name="add" size={24} color={colors.textPrimary} />
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {store.ideas.map((idea) => renderIdeaRow(idea))}
-            </ScrollView>
-          </View>
-        </View>
-      </View>
-    </SafeAreaView>
+    <PageTransition variant="tab" routeKey="index">
+      <SafeAreaView style={[sharedStyles.root, { backgroundColor: colors.background }]} edges={["left", "right"]}>
+        {isMobile ? mobileLayout : isTablet ? tabletLayout : desktopLayout}
+      </SafeAreaView>
+    </PageTransition>
   );
 }
 
 // ─── Styles specific to the Dashboard ──────────────────────────
 
 const styles = StyleSheet.create({
-  /* Left panel (Dashboard) */
-  leftPanel: {
-    width: 320,
-  },
-
-  /* Center panel (Editor) */
   centerPanel: {
     flex: 1,
-    paddingTop: 20,
-    paddingHorizontal: 24,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    minWidth: 0,
   },
   editorTitle: {
     ...typography.title,
-    fontSize: 48,
-    marginBottom: 20,
+    marginBottom: spacing.lg,
     borderWidth: 0,
     backgroundColor: "transparent",
-    outlineStyle: "none" as any,
+    outlineStyle: "none" as never,
   },
   editorContent: {
     flex: 1,
     ...typography.body,
-    fontSize: 18,
     borderWidth: 0,
     backgroundColor: "transparent",
-    outlineStyle: "none" as any,
+    outlineStyle: "none" as never,
   },
-
-  /* Right column (Dashboard) */
   rightColumn: {
-    width: 320,
-    gap: 24,
+    flexDirection: "column",
+    flexShrink: 0,
   },
   rightPanel: {
     flex: 1,
+    minHeight: 200,
+  },
+  mobileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: spacing.sm,
+    gap: spacing.md,
+  },
+  menuButton: {
+    padding: spacing.xs,
+  },
+  mobileHeaderTitle: {
+    ...typography.subtitle,
+    flex: 1,
+    textAlign: "center",
   },
 });

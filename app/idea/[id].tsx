@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ModalShell } from "../../components/ModalShell";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { BackButton } from "../../components/BackButton";
+import { DETAIL_FALLBACKS } from "../../utils/routes";
+import { goBack } from "../../utils/navigation";
 
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
-
-const IDEA_COLORS = ["#6366F1", "#22C55E", "#3B82F6", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6", "#14B8A6"];
+import { FavoriteStarButton } from "../../components/FavoriteStarButton";
+import { formatDate } from "../../utils/formatDate";
+import { PageTransition } from "../../components/PageTransition";
+import { IdeaColorPicker } from "../../components/IdeaColorPicker";
+import { IdeaColorDot } from "../../components/IdeaColorDot";
+import { resolveIdeaColorLabel } from "../../constants/ideaColors";
 
 export default function IdeaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -17,6 +24,7 @@ export default function IdeaDetailScreen() {
   const router = useRouter();
 
   const idea = store.ideas.find((i) => i.id === id);
+  const ideaColorLabels = useNotesStore((s) => s.ideaColorLabels);
 
   const [title, setTitle] = useState(idea?.title ?? "");
   const [description, setDescription] = useState(idea?.description ?? "");
@@ -39,42 +47,40 @@ export default function IdeaDetailScreen() {
   const handleDelete = () => {
     if (!id) return;
     store.deleteIdea(id);
-    router.back();
+    goBack(router, DETAIL_FALLBACKS.idea);
   };
 
   if (!idea) {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+      <PageTransition variant="stack">
+      <ModalShell style={styles.root}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Ionicons name="close" size={28} color={colors.textPrimary} />
-          </Pressable>
+          <BackButton fallback={DETAIL_FALLBACKS.idea} icon="close" />
         </View>
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             Idea no encontrada
           </Text>
         </View>
-      </SafeAreaView>
+      </ModalShell>
+      </PageTransition>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+    <PageTransition variant="stack">
+    <ModalShell style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => { handleSave(); router.back(); }} hitSlop={8}>
-          <Ionicons name="chevron-down" size={28} color={colors.textPrimary} />
-        </Pressable>
+        <BackButton fallback={DETAIL_FALLBACKS.idea} onPressBefore={handleSave} />
 
         <View style={styles.headerActions}>
-          <Pressable onPress={() => store.toggleIdeaFavorite(id!)} hitSlop={8} style={styles.headerBtn}>
-            <Ionicons
-              name={idea.isFavorite ? "star" : "star-outline"}
-              size={22}
-              color={idea.isFavorite ? colors.accent : colors.textPrimary}
-            />
-          </Pressable>
+          <FavoriteStarButton
+            isFavorite={idea.isFavorite}
+            onPress={() => store.toggleIdeaFavorite(id!)}
+            size={22}
+            style={styles.headerBtn}
+          />
           <Pressable onPress={handleDelete} hitSlop={8} style={styles.headerBtn}>
             <Ionicons name="trash-outline" size={22} color={colors.error} />
           </Pressable>
@@ -86,8 +92,12 @@ export default function IdeaDetailScreen() {
         style={styles.editorScroll}
         contentContainerStyle={styles.editorContainer}
       >
-        {/* Color indicator */}
-        <View style={[styles.colorBadge, { backgroundColor: idea.color }]} />
+        <View style={styles.colorHeader}>
+          <IdeaColorDot color={idea.color} size={32} />
+          <Text style={[styles.colorLabel, { color: colors.textSecondary }]}>
+            {resolveIdeaColorLabel(idea.color, ideaColorLabels)}
+          </Text>
+        </View>
 
         <TextInput
           style={[styles.titleInput, { color: colors.textPrimary }]}
@@ -113,21 +123,10 @@ export default function IdeaDetailScreen() {
           selectionColor={colors.accent}
         />
 
-        {/* Color picker */}
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Color</Text>
-        <View style={styles.colorRow}>
-          {IDEA_COLORS.map((c) => (
-            <Pressable
-              key={c}
-              onPress={() => store.updateIdea(id as string, { color: c })}
-              style={[
-                styles.colorCircle,
-                { backgroundColor: c },
-                idea.color === c && { borderWidth: 3, borderColor: colors.textPrimary },
-              ]}
-            />
-          ))}
-        </View>
+        <IdeaColorPicker
+          selectedColor={idea.color}
+          onSelectColor={(hex) => store.updateIdea(id as string, { color: hex })}
+        />
 
         {/* Tags */}
         {idea.tags.length > 0 && (
@@ -147,10 +146,11 @@ export default function IdeaDetailScreen() {
       {/* Footer meta */}
       <View style={[styles.footer, { borderTopColor: colors.divider }]}>
         <Text style={[styles.footerText, { color: colors.textTertiary }]}>
-          Creada: {idea.createdAt.toLocaleDateString()}
+          Creada: {formatDate(idea.createdAt)}
         </Text>
       </View>
-    </SafeAreaView>
+    </ModalShell>
+    </PageTransition>
   );
 }
 
@@ -181,11 +181,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     flexGrow: 1,
   },
-  colorBadge: {
-    width: 48,
-    height: 6,
-    borderRadius: 3,
+  colorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
     marginBottom: spacing.lg,
+  },
+  colorLabel: {
+    ...typography.subtitle,
   },
   titleInput: {
     ...typography.title,
@@ -208,16 +211,6 @@ const styles = StyleSheet.create({
     ...typography.subtitle,
     marginTop: spacing.xl,
     marginBottom: spacing.md,
-  },
-  colorRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-    flexWrap: "wrap",
-  },
-  colorCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
   },
   tagsRow: {
     flexDirection: "row",
