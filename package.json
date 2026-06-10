@@ -4,22 +4,27 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
-    "api": "npm run dev --prefix server",
-    "api:start": "npm run start --prefix server",
+    "api": "npm run dev --prefix noteflow-api",
+    "api:start": "npm run start --prefix noteflow-api",
     "db:test": "npm run db:test --prefix server",
-    "db:migrate": "npm run db:migrate --prefix server"
+    "db:migrate": "npm run db:migrate --prefix server",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.13",
     "@expo/vector-icons": "^15.0.2",
     "@neondatabase/serverless": "^1.1.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-firebase/app": "^24.1.0",
+    "@react-native-firebase/auth": "^24.1.0",
+    "@react-native-firebase/firestore": "^24.1.0",
     "@shopify/flash-list": "2.0.2",
     "expo": "^56.0.8",
     "expo-constants": "~56.0.16",
+    "expo-dev-client": "~56.0.19",
     "expo-font": "~56.0.5",
     "expo-haptics": "~56.0.3",
     "expo-linking": "~56.0.13",
@@ -37,6 +42,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.14",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "private": true

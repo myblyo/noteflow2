@@ -67,7 +67,14 @@ async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  } catch {
+    throw new Error(
+      `No se puede conectar con la API (${BASE_URL}). Arranca la API: npm run api`,
+    );
+  }
   if (!res.ok) {
     let message = `Error ${res.status}`;
     try {

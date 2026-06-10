@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "751288639746",
+    "project_id": "noteflow2-18554",
+    "storage_bucket": "noteflow2-18554.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:751288639746:android:40c109ce1c5f72d209621b",
+        "android_client_info": {
+          "package_name": "com.myblyo.noteflow2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO4Pk3NYidMSg_6k_wRXOOldxpVD0GDmQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
