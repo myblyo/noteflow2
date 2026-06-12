@@ -26,9 +26,16 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
 
   const handleRegister = async () => {
-    await auth.register(name.trim(), email.trim(), password);
-    await fetchNotes();
-    router.replace("/(tabs)");
+    if (password.length < 6) {
+      return;
+    }
+    try {
+      await auth.register(name.trim(), email.trim(), password);
+      await fetchNotes();
+      router.replace("/(tabs)");
+    } catch {
+      /* error en authStore */
+    }
   };
 
   return (
@@ -40,6 +47,9 @@ export default function RegisterScreen() {
         <View style={styles.card}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>
             Crear cuenta
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Se creará tu usuario en Firebase y tu perfil en Firestore
           </Text>
 
           <TextInput
@@ -116,7 +126,8 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "center", padding: spacing.xl },
   card: { gap: spacing.md },
-  title: { ...typography.h1, textAlign: "center", marginBottom: spacing.md },
+  title: { ...typography.h1, textAlign: "center", marginBottom: spacing.sm },
+  subtitle: { ...typography.body, textAlign: "center", marginBottom: spacing.md },
   input: {
     borderWidth: 1,
     borderRadius: radius.md,

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyToken, type AuthUser } from "@/lib/auth";
+import { verifyFirebaseIdToken } from "@/lib/firebase-admin";
+import { resolveNeonUserId } from "@/lib/firebase-user";
 
 export async function requireAuth(
   request: Request,
@@ -9,10 +11,21 @@ export async function requireAuth(
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const token = header.slice(7);
+
   try {
-    return await verifyToken(header.slice(7));
+    return await verifyToken(token);
   } catch {
-    return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+    try {
+      const firebase = await verifyFirebaseIdToken(token);
+      const neon = await resolveNeonUserId({
+        uid: firebase.uid,
+        email: firebase.email,
+      });
+      return { userId: neon.userId, email: neon.email };
+    } catch {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+    }
   }
 }
 

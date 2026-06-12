@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, TextInput, Pressable, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useNotesStore } from "../store/noteStore";
@@ -7,6 +7,7 @@ import { useThemeColors } from "../hooks/useTheme";
 import { useResponsive } from "../hooks/useResponsive";
 import { spacing, radius, typography } from "../constants/theme";
 import { TrashButton } from "./TrashButton";
+import { ProfileNavButton } from "./ProfileNavButton";
 
 export function SearchBar() {
   const colors = useThemeColors();
@@ -83,6 +84,8 @@ export function SearchBar() {
             color={filterActive ? colors.accent : colors.textPrimary}
           />
         </Pressable>
+
+        {Platform.OS !== "web" ? <ProfileNavButton size={actionSize} /> : null}
       </View>
     </View>
   );

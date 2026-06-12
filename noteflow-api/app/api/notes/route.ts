@@ -6,7 +6,7 @@ import { isAuthResponse, requireAuth } from "@/lib/require-auth";
 import { z } from "zod";
 
 const noteSchema = z.object({
-  title: z.string().min(3),
+  title: z.string().trim().min(1).max(255),
   type: z.enum(["note", "checklist", "idea"]),
   content: z.string().optional(),
   color: z.string().optional(),

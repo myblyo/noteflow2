@@ -278,14 +278,21 @@ export const useNotesStore = create<NotesStore>()((set, get) => ({
 
   updateNote: async (id, updates) => {
     set({ error: null });
-    const row = await api.updateNote(id, {
-      title: updates.title,
-      content: updates.content,
-    });
-    const updated = api.mapApiNote(row) as Note;
-    set((state) => ({
-      notes: state.notes.map((n) => (n.id === id ? updated : n)),
-    }));
+    try {
+      const row = await api.updateNote(id, {
+        title: updates.title,
+        content: updates.content,
+      });
+      const updated = api.mapApiNote(row) as Note;
+      set((state) => ({
+        notes: state.notes.map((n) => (n.id === id ? updated : n)),
+      }));
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : "Error al guardar la nota",
+      });
+    }
   },
 
   updateIdea: async (id, updates) => {

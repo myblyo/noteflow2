@@ -1,7 +1,7 @@
 import type { AnyNote, ChecklistNote, IdeaNote, Note } from "../types";
+import { resolveApiBaseUrl } from "./apiBaseUrl";
 
-const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api";
+const BASE_URL = resolveApiBaseUrl();
 
 let authToken: string | null = null;
 
@@ -78,8 +78,17 @@ async function apiFetch<T>(
   if (!res.ok) {
     let message = `Error ${res.status}`;
     try {
-      const body = await res.json();
-      message = body.error ?? message;
+      const body = (await res.json()) as {
+        error?: string;
+        errors?: Array<{ message?: string; path?: (string | number)[] }>;
+      };
+      if (body.errors?.length) {
+        message = body.errors
+          .map((issue) => issue.message ?? "Dato inválido")
+          .join(". ");
+      } else {
+        message = body.error ?? message;
+      }
     } catch {
       /* respuesta no JSON */
     }
@@ -243,4 +252,30 @@ export async function patchChecklistItem(
 
 export async function deleteChecklistItem(itemId: string): Promise<void> {
   await apiFetch<void>(`/checklist-items/${itemId}`, { method: "DELETE" });
+}
+
+export type ApiNoteAttachment = {
+  id: string;
+  note_id: string;
+  url: string;
+  owner_id: string;
+  created_at: string;
+};
+
+export async function getNoteAttachments(
+  noteId: string,
+): Promise<ApiNoteAttachment[]> {
+  return apiFetch<ApiNoteAttachment[]>(`/notes/${noteId}/attachments`);
+}
+
+/** Paso 4 (notas): guarda la URL pública en PostgreSQL */
+export async function addNoteAttachment(
+  noteId: string,
+  url: string,
+): Promise<ApiNoteAttachment> {
+  return apiFetch<ApiNoteAttachment>(`/notes/${noteId}/attachments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
 }

@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       },
       { status: 201 },
     );
-  } catch {
+  } catch (error) {
+    console.error("[auth/register]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

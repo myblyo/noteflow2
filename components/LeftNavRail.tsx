@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeColors } from "../hooks/useTheme";
 import { spacing, radius } from "../constants/theme";
 import { ThemeToggleButton } from "./ThemeToggleButton";
+import { ProfileNavButton } from "./ProfileNavButton";
 import { TAB_ROUTES, type TabRouteName } from "../utils/routes";
 import { useNavTransitionStore } from "../store/navTransitionStore";
 
@@ -78,7 +79,17 @@ export function LeftNavRail() {
 
     animateIndicator(indicatorY, index);
     useNavTransitionStore.getState().setSlideByTabIndex(activeIndex, index);
-    router.navigate(tab.href);
+
+    const onTabStack =
+      rootSegment === "(tabs)" ||
+      TABS.some((item) => item.name === rootSegment);
+
+    if (onTabStack) {
+      router.navigate(tab.href);
+      return;
+    }
+
+    router.replace(tab.href);
   };
 
   return (
@@ -129,7 +140,10 @@ export function LeftNavRail() {
         })}
       </View>
 
-      <ThemeToggleButton size={20} style={styles.themeButton} />
+      <View style={styles.footer}>
+        <ThemeToggleButton size={20} style={styles.themeButton} />
+        <ProfileNavButton size={TAB_SIZE} />
+      </View>
     </View>
   );
 }
@@ -137,6 +151,7 @@ export function LeftNavRail() {
 const styles = StyleSheet.create({
   bar: {
     width: 64,
+    alignSelf: "stretch",
     borderRightWidth: StyleSheet.hairlineWidth,
     justifyContent: "space-between",
     alignItems: "center",
@@ -145,6 +160,11 @@ const styles = StyleSheet.create({
     position: "relative",
     gap: TAB_GAP,
     alignItems: "center",
+  },
+  footer: {
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: "auto",
   },
   indicator: {
     position: "absolute",

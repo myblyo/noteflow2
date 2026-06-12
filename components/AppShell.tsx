@@ -1,9 +1,8 @@
-import React, { useEffect } from "react";
-import { View } from "react-native";
+import React from "react";
+import { Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSegments } from "expo-router";
 
-import { useAuthStore } from "../store/authStore";
 import { useFetchNotes } from "../hooks/useFetchNotes";
 import { useThemeColors } from "../hooks/useTheme";
 import { useResponsive } from "../hooks/useResponsive";
@@ -15,12 +14,6 @@ interface AppShellProps {
 
 /** Barra lateral + área de contenido en todas las pantallas */
 export function AppShell({ children }: AppShellProps) {
-  const initAuth = useAuthStore((s) => s.init);
-
-  useEffect(() => {
-    initAuth();
-  }, [initAuth]);
-
   useFetchNotes();
   const colors = useThemeColors();
   const { isMobile } = useResponsive();
@@ -34,7 +27,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
-      edges={isMobile ? [] : ["top"]}
+      edges={Platform.OS === "web" ? (isMobile ? [] : ["top"]) : ["top", "bottom"]}
     >
       <View style={{ flex: 1, flexDirection: "row" }}>
         <LeftNavRail />

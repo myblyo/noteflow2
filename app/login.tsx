@@ -25,9 +25,13 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    await auth.login(email.trim(), password);
-    await fetchNotes();
-    router.replace("/(tabs)");
+    try {
+      await auth.login(email.trim(), password);
+      await fetchNotes();
+      router.replace("/(tabs)");
+    } catch {
+      /* error en authStore */
+    }
   };
 
   return (
@@ -44,8 +48,7 @@ export default function LoginScreen() {
             Inicia sesión para ver tus notas
           </Text>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
-            Necesitas la API en marcha (otra terminal: npm run api). Si es tu
-            primera vez, pulsa «Crear cuenta».
+            Usa tu cuenta de Firebase. ¿Primera vez? Pulsa «Crear cuenta».
           </Text>
 
           <TextInput

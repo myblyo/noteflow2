@@ -14,7 +14,8 @@ interface PageTransitionProps {
   style?: StyleProp<ViewStyle>;
 }
 
-function isTabRouteActive(pathname: string, routeKey: TabRouteName) {
+function isTabRouteActive(pathname: string | undefined, routeKey: TabRouteName) {
+  if (!pathname) return false;
   if (routeKey === "index") {
     return (
       pathname === "/(tabs)" ||

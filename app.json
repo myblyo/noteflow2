@@ -8,15 +8,17 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.myblyo.noteflow2",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.Noteflow2"
+      "package": "com.myblyo.noteflow2"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -24,7 +26,15 @@
     "plugins": [
       "expo-router",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Noteflow necesita acceso a tus fotos para el perfil y adjuntos en notas.",
+          "cameraPermission": "Noteflow necesita la cámara para tomar fotos de perfil o adjuntarlas a notas."
+        }
+      ],
+      "expo-image"
     ],
     "extra": {
       "router": {},

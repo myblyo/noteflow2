@@ -17,6 +17,9 @@ import { FavoriteStarButton } from "../../components/FavoriteStarButton";
 import { formatDate } from "../../utils/formatDate";
 import { useResponsive } from "../../hooks/useResponsive";
 import { PageTransition } from "../../components/PageTransition";
+import { ImageAttachButton } from "../../components/ImageAttachButton";
+import { RemoteImage } from "../../components/RemoteImage";
+import { addNoteAttachment, getNoteAttachments } from "../../lib/api";
 
 export default function NotaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,6 +27,8 @@ export default function NotaDetailScreen() {
   const { isMobile, isLargeScreen, isXL, isWide, width } = useResponsive();
   const store = useNotesStore();
   const router = useRouter();
+
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const chromePadding = isXL ? 56 : isLargeScreen ? 48 : isMobile ? 24 : 36;
   const editorPadding = isXL ? 40 : isLargeScreen ? 32 : isMobile ? 16 : 24;
@@ -45,6 +50,19 @@ export default function NotaDetailScreen() {
       setContent(note.content);
     }
   }, [note?.id]);
+
+  useEffect(() => {
+    if (!id) return;
+    getNoteAttachments(id)
+      .then((rows) => setImageUrls(rows.map((r) => r.url)))
+      .catch(() => setImageUrls([]));
+  }, [id]);
+
+  const handleImageUploaded = async (publicUrl: string) => {
+    if (!id) return;
+    await addNoteAttachment(id, publicUrl);
+    setImageUrls((prev) => [...prev, publicUrl]);
+  };
 
   const handleSave = () => {
     if (!id) return;
@@ -171,6 +189,25 @@ export default function NotaDetailScreen() {
           underlineColorAndroid="transparent"
           selectionColor={colors.accent}
         />
+
+        <ImageAttachButton
+          label="Adjuntar a nota"
+          folder="notes"
+          onUploaded={handleImageUploaded}
+        />
+
+        {imageUrls.length > 0 ? (
+          <View style={styles.attachments}>
+            {imageUrls.map((url) => (
+              <RemoteImage
+                key={url}
+                uri={url}
+                style={styles.attachmentImage}
+                recyclingKey={url}
+              />
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Footer meta */}
@@ -250,5 +287,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.subtitle,
+  },
+  attachments: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  attachmentImage: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.md,
   },
 });

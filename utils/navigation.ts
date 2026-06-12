@@ -24,5 +24,5 @@ export function goBack(router: AppRouter, fallback: Href) {
     router.back();
     return;
   }
-  router.replace(fallback);
+  router.replace(fallback ?? "/(tabs)");
 }

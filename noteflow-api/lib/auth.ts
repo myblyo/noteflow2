@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "dev-secret-change-in-production",
+  process.env.JWT_SECRET?.trim() || "dev-secret-change-in-production",
 );
 
 export type AuthUser = {

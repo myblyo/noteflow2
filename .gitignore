@@ -37,6 +37,7 @@ server/.env
 
 # API runtime data (seed is auto-created)
 server/data/db.json
+noteflow-api/public/uploads/
 
 # typescript
 *.tsbuildinfo

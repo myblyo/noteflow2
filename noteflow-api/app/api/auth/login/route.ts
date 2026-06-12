@@ -42,7 +42,8 @@ export async function POST(request: Request) {
       token,
       user: { id: user.id, email: user.email, name: user.name },
     });
-  } catch {
+  } catch (error) {
+    console.error("[auth/login]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

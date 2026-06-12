@@ -34,6 +34,7 @@ import { useResponsive } from "../../hooks/useResponsive";
 import { MobileDrawer } from "../../components/MobileDrawer";
 import type { ChecklistNote } from "../../types";
 import { PageTransition } from "../../components/PageTransition";
+import { ProfileNavButton } from "../../components/ProfileNavButton";
 
 
 
@@ -106,16 +107,13 @@ export default function DashboardScreen() {
   }, [store.selectedNoteId, isMobile]);
 
   const handleSaveEditor = async () => {
+    const title = editorTitle.trim() || "Sin título";
+    const content = editorContent.trim();
+
     if (store.selectedNoteId) {
-      await store.updateNote(store.selectedNoteId, {
-        title: editorTitle,
-        content: editorContent,
-      });
-    } else if (editorTitle.trim()) {
-      const newNote = await store.addNote({
-        title: editorTitle.trim(),
-        content: editorContent.trim(),
-      });
+      await store.updateNote(store.selectedNoteId, { title, content });
+    } else if (editorTitle.trim() || content) {
+      const newNote = await store.addNote({ title, content });
       store.setSelectedNoteId(newNote.id);
     }
   };
@@ -456,10 +454,15 @@ export default function DashboardScreen() {
         >
           {selectedNote?.title || "Nueva nota"}
         </Text>
-        {!selectionMode && (
-          <Pressable onPress={handleAddNote} hitSlop={8}>
-            <Ionicons name="add" size={26} color={colors.textPrimary} />
-          </Pressable>
+        {!selectionMode ? (
+          <View style={styles.mobileHeaderActions}>
+            <ProfileNavButton size={36} />
+            <Pressable onPress={handleAddNote} hitSlop={8}>
+              <Ionicons name="add" size={26} color={colors.textPrimary} />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={{ width: 36 }} />
         )}
       </View>
       {editorPanel}
@@ -523,5 +526,10 @@ const styles = StyleSheet.create({
     ...typography.subtitle,
     flex: 1,
     textAlign: "center",
+  },
+  mobileHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
 });

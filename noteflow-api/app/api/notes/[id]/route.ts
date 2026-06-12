@@ -9,7 +9,7 @@ import { isAuthResponse, requireAuth } from "@/lib/require-auth";
 import { z } from "zod";
 
 const patchNoteSchema = z.object({
-  title: z.string().min(3).optional(),
+  title: z.string().trim().min(1).max(255).optional(),
   type: z.enum(["note", "checklist", "idea"]).optional(),
   content: z.string().optional(),
   color: z.string().nullable().optional(),
