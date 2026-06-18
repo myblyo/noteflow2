@@ -18,6 +18,8 @@ import { navigateForward } from "../../utils/navigation";
 import { AddButton } from "../../components/AddButton";
 import { FavoriteStarButton } from "../../components/FavoriteStarButton";
 import { SelectionCheckbox } from "../../components/SelectionCheckbox";
+import { RemoteImage } from "../../components/RemoteImage";
+import { getPlainTextFromContent } from "../../utils/noteDocument";
 
 export default function NotasScreen() {
   const colors = useThemeColors();
@@ -75,8 +77,33 @@ export default function NotasScreen() {
             style={[sharedStyles.bodyText, { color: colors.textSecondary }]}
             numberOfLines={1}
           >
-            {note.content || "Sin contenido"}
+            {getPlainTextFromContent(note.content) || "Sin contenido"}
           </Text>
+          {(note.attachmentCount ?? 0) > 0 && note.attachmentPreviewUrl ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginTop: spacing.xs,
+                gap: spacing.xs,
+              }}
+            >
+              <RemoteImage
+                uri={note.attachmentPreviewUrl}
+                style={{ width: 36, height: 36, borderRadius: 6 }}
+              />
+              {(note.attachmentCount ?? 0) > 1 ? (
+                <Text
+                  style={[
+                    sharedStyles.bodyText,
+                    { color: colors.textTertiary, fontSize: 12 },
+                  ]}
+                >
+                  +{(note.attachmentCount ?? 0) - 1}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={sharedStyles.noteCardRight}>

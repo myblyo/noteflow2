@@ -3,8 +3,8 @@ import { z } from "zod";
 import {
   insertNoteAttachment,
   listNoteAttachments,
-  noteExists,
 } from "@/lib/note-attachments";
+import { noteBelongsToUser } from "@/lib/note-access";
 import { isAuthResponse, requireAuth } from "@/lib/require-auth";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -13,19 +13,19 @@ const attachmentSchema = z.object({
   url: z.string().url(),
 });
 
-/** Paso 4 (notas): guardar URL pública del adjunto en PostgreSQL */
 export async function GET(_request: Request, { params }: RouteContext) {
   const auth = await requireAuth(_request);
   if (isAuthResponse(auth)) return auth;
 
   try {
     const { id } = await params;
-    if (!(await noteExists(id))) {
+    if (!(await noteBelongsToUser(id, auth.userId))) {
       return NextResponse.json({ error: "Nota no encontrada" }, { status: 404 });
     }
     const attachments = await listNoteAttachments(id);
     return NextResponse.json(attachments);
-  } catch {
+  } catch (error) {
+    console.error("[attachments GET]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
@@ -36,7 +36,7 @@ export async function POST(request: Request, { params }: RouteContext) {
 
   try {
     const { id } = await params;
-    if (!(await noteExists(id))) {
+    if (!(await noteBelongsToUser(id, auth.userId))) {
       return NextResponse.json({ error: "Nota no encontrada" }, { status: 404 });
     }
 
@@ -56,7 +56,8 @@ export async function POST(request: Request, { params }: RouteContext) {
     });
 
     return NextResponse.json(attachment, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error("[attachments POST]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

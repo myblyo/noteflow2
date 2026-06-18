@@ -33,6 +33,8 @@ export type ApiNote = {
   updated_at: string;
   tags?: string[];
   items?: Array<{ id: string; task: string; is_completed: boolean }>;
+  attachment_preview?: string | null;
+  attachment_count?: number;
 };
 
 export type CreateNoteInput = {
@@ -132,6 +134,8 @@ export function mapApiNote(row: ApiNote): AnyNote {
   return {
     ...base,
     content: row.content,
+    attachmentPreviewUrl: row.attachment_preview ?? null,
+    attachmentCount: row.attachment_count ?? 0,
   } satisfies Note;
 }
 
@@ -277,5 +281,11 @@ export async function addNoteAttachment(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
+  });
+}
+
+export async function deleteNoteAttachment(attachmentId: string): Promise<void> {
+  await apiFetch<void>(`/note-attachments/${attachmentId}`, {
+    method: "DELETE",
   });
 }

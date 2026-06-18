@@ -68,6 +68,11 @@ interface NotesStore {
     updates: Partial<Pick<ChecklistNote, "title" | "items">>,
   ) => Promise<void>;
   setIdeaColorLabel: (hex: string, label: string) => void;
+  setNoteAttachmentMeta: (
+    id: string,
+    previewUrl: string | null,
+    count: number,
+  ) => void;
 }
 
 export const useNotesStore = create<NotesStore>()((set, get) => ({
@@ -285,7 +290,16 @@ export const useNotesStore = create<NotesStore>()((set, get) => ({
       });
       const updated = api.mapApiNote(row) as Note;
       set((state) => ({
-        notes: state.notes.map((n) => (n.id === id ? updated : n)),
+        notes: state.notes.map((n) =>
+          n.id === id
+            ? {
+                ...updated,
+                attachmentPreviewUrl:
+                  updated.attachmentPreviewUrl ?? n.attachmentPreviewUrl,
+                attachmentCount: updated.attachmentCount ?? n.attachmentCount,
+              }
+            : n,
+        ),
       }));
     } catch (error) {
       set({
@@ -342,5 +356,14 @@ export const useNotesStore = create<NotesStore>()((set, get) => ({
         ...state.ideaColorLabels,
         [hex]: label,
       },
+    })),
+
+  setNoteAttachmentMeta: (id, previewUrl, count) =>
+    set((state) => ({
+      notes: state.notes.map((n) =>
+        n.id === id
+          ? { ...n, attachmentPreviewUrl: previewUrl, attachmentCount: count }
+          : n,
+      ),
     })),
 }));

@@ -34,6 +34,22 @@ export async function insertNoteAttachment(input: {
   return row;
 }
 
+export async function deleteNoteAttachment(
+  attachmentId: string,
+  userId: string,
+): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `DELETE FROM note_attachments na
+     USING notes n
+     WHERE na.id = $1
+       AND na.note_id = n.id
+       AND n.user_id = $2
+     RETURNING na.id`,
+    [attachmentId, userId],
+  );
+  return rows.length > 0;
+}
+
 export async function noteExists(noteId: string): Promise<boolean> {
   const rows = await query<{ id: string }>(
     "SELECT id FROM notes WHERE id = $1",

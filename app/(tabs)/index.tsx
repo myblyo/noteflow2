@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,9 @@ import { MobileDrawer } from "../../components/MobileDrawer";
 import type { ChecklistNote } from "../../types";
 import { PageTransition } from "../../components/PageTransition";
 import { ProfileNavButton } from "../../components/ProfileNavButton";
+import { NoteRichEditor, type NoteRichEditorRef } from "../../components/NoteRichEditor";
+import { RemoteImage } from "../../components/RemoteImage";
+import { documentIsEmpty, getPlainTextFromContent, parseNoteContent } from "../../utils/noteDocument";
 
 
 
@@ -67,6 +70,9 @@ export default function DashboardScreen() {
   const [editorTitle, setEditorTitle] = useState("");
   const [editorContent, setEditorContent] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const editorRef = useRef<NoteRichEditorRef>(null);
+  const saveInFlightRef = useRef(false);
+  const loadedEditorNoteIdRef = useRef<string | null>(null);
 
   const filteredNotes = useMemo(
     () => filterNotes(store.notes, searchQuery, showFavoritesOnly),
@@ -89,16 +95,25 @@ export default function DashboardScreen() {
     return "No hay tareas";
   };
 
-  const selectedNote = store.notes.find((n) => n.id === store.selectedNoteId);
   useEffect(() => {
-    if (selectedNote) {
-      setEditorTitle(selectedNote.title);
-      setEditorContent(selectedNote.content);
-    } else {
+    const noteId = store.selectedNoteId;
+    if (noteId === loadedEditorNoteIdRef.current) {
+      return;
+    }
+    loadedEditorNoteIdRef.current = noteId;
+
+    if (!noteId) {
       setEditorTitle("");
       setEditorContent("");
+      return;
     }
-  }, [store.selectedNoteId]);
+
+    const note = store.notes.find((n) => n.id === noteId);
+    if (note) {
+      setEditorTitle(note.title);
+      setEditorContent(note.content);
+    }
+  }, [store.selectedNoteId, store.notes]);
 
   useEffect(() => {
     if (isMobile && store.selectedNoteId) {
@@ -107,16 +122,43 @@ export default function DashboardScreen() {
   }, [store.selectedNoteId, isMobile]);
 
   const handleSaveEditor = async () => {
-    const title = editorTitle.trim() || "Sin título";
-    const content = editorContent.trim();
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
 
-    if (store.selectedNoteId) {
-      await store.updateNote(store.selectedNoteId, { title, content });
-    } else if (editorTitle.trim() || content) {
-      const newNote = await store.addNote({ title, content });
-      store.setSelectedNoteId(newNote.id);
+    try {
+      const title = editorTitle.trim() || "Sin título";
+      let content = editorContent;
+
+      if (store.selectedNoteId) {
+        if (editorRef.current?.hasPendingUploads()) {
+          content = await editorRef.current.flushPendingUploads(store.selectedNoteId);
+          setEditorContent(content);
+        }
+        await store.updateNote(store.selectedNoteId, { title, content });
+        return;
+      }
+
+      const hasContent =
+        editorTitle.trim() ||
+        !documentIsEmpty(parseNoteContent(editorContent)) ||
+        editorRef.current?.hasPendingUploads();
+
+      if (hasContent) {
+        const newNote = await store.addNote({ title, content });
+        if (editorRef.current?.hasPendingUploads()) {
+          content = await editorRef.current.flushPendingUploads(newNote.id);
+          setEditorContent(content);
+          await store.updateNote(newNote.id, { title, content });
+        }
+        loadedEditorNoteIdRef.current = newNote.id;
+        store.setSelectedNoteId(newNote.id);
+      }
+    } finally {
+      saveInFlightRef.current = false;
     }
   };
+
+  const selectedNote = store.notes.find((n) => n.id === store.selectedNoteId);
 
   const handleAddNote = () => {
     navigateForward(router, nuevaNotaRoute());
@@ -159,8 +201,21 @@ export default function DashboardScreen() {
             {note.title || "Sin título"}
           </Text>
           <Text style={[sharedStyles.bodyText, { color: colors.textSecondary }]} numberOfLines={1}>
-            {note.content || "Sin contenido"}
+            {getPlainTextFromContent(note.content) || "Sin contenido"}
           </Text>
+          {(note.attachmentCount ?? 0) > 0 && note.attachmentPreviewUrl ? (
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: spacing.xs, gap: spacing.xs }}>
+              <RemoteImage
+                uri={note.attachmentPreviewUrl}
+                style={{ width: 36, height: 36, borderRadius: 6 }}
+              />
+              {(note.attachmentCount ?? 0) > 1 ? (
+                <Text style={[sharedStyles.bodyText, { color: colors.textTertiary, fontSize: 12 }]}>
+                  +{(note.attachmentCount ?? 0) - 1}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         {!selectionMode && (
@@ -325,17 +380,17 @@ export default function DashboardScreen() {
         underlineColorAndroid="transparent"
         selectionColor={colors.accent}
       />
-      <TextInput
-        style={[styles.editorContent, { color: colors.textPrimary, fontSize: editorBodySize, flex: 1 }]}
-        placeholder="Start writing..."
-        placeholderTextColor={colors.textTertiary}
+      <NoteRichEditor
+        ref={editorRef}
         value={editorContent}
-        onChangeText={setEditorContent}
+        onChange={setEditorContent}
+        noteId={store.selectedNoteId}
+        placeholder="Start writing..."
+        fontSize={editorBodySize}
         onBlur={handleSaveEditor}
-        multiline
-        textAlignVertical="top"
-        underlineColorAndroid="transparent"
-        selectionColor={colors.accent}
+        onAttachmentsChange={(noteId, urls) => {
+          store.setNoteAttachmentMeta(noteId, urls[0] ?? null, urls.length);
+        }}
       />
     </View>
   );

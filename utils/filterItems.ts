@@ -1,5 +1,6 @@
 import type { Note, IdeaNote, ChecklistNote } from "../types";
 import { matchesSearch } from "./search";
+import { getPlainTextFromContent } from "./noteDocument";
 
 export function filterNotes(
   notes: Note[],
@@ -10,7 +11,7 @@ export function filterNotes(
   if (favoritesOnly) result = result.filter((note) => note.isFavorite);
   if (!query.trim()) return result;
   return result.filter((note) =>
-    matchesSearch(query, note.title, note.content),
+    matchesSearch(query, note.title, getPlainTextFromContent(note.content)),
   );
 }
 

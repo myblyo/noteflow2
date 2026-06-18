@@ -2,6 +2,7 @@
   "expo": {
     "name": "Noteflow2",
     "slug": "Noteflow2",
+    "scheme": "noteflow2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

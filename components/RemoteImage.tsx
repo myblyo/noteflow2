@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Image, type ImageContentFit } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../hooks/useTheme";
 
 type RemoteImageProps = {
@@ -29,6 +30,7 @@ export function RemoteImage({
 }: RemoteImageProps) {
   const colors = useThemeColors();
   const [loading, setLoading] = useState(Boolean(uri));
+  const [failed, setFailed] = useState(false);
 
   if (!uri) {
     return (
@@ -49,13 +51,24 @@ export function RemoteImage({
         cachePolicy="memory-disk"
         transition={200}
         recyclingKey={recyclingKey ?? uri}
-        onLoadStart={() => setLoading(true)}
+        onLoadStart={() => {
+          setFailed(false);
+          setLoading(true);
+        }}
         onLoad={() => setLoading(false)}
-        onError={() => setLoading(false)}
+        onError={() => {
+          setLoading(false);
+          setFailed(true);
+        }}
       />
       {loading ? (
         <View style={[styles.overlay, { backgroundColor: colors.surface }]}>
           <ActivityIndicator size="small" color={colors.accent} />
+        </View>
+      ) : null}
+      {failed ? (
+        <View style={[styles.overlay, { backgroundColor: colors.surfaceSecondary }]}>
+          <Ionicons name="image-outline" size={22} color={colors.textTertiary} />
         </View>
       ) : null}
     </View>
@@ -72,7 +85,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     opacity: 0.85,

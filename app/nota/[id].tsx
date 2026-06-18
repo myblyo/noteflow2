@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from "react-native";
 import { ModalShell } from "../../components/ModalShell";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,9 +17,11 @@ import { FavoriteStarButton } from "../../components/FavoriteStarButton";
 import { formatDate } from "../../utils/formatDate";
 import { useResponsive } from "../../hooks/useResponsive";
 import { PageTransition } from "../../components/PageTransition";
-import { ImageAttachButton } from "../../components/ImageAttachButton";
-import { RemoteImage } from "../../components/RemoteImage";
-import { addNoteAttachment, getNoteAttachments } from "../../lib/api";
+import {
+  NoteRichEditor,
+  type NoteRichEditorRef,
+} from "../../components/NoteRichEditor";
+import { getNoteAttachments } from "../../lib/api";
 
 export default function NotaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,8 +29,6 @@ export default function NotaDetailScreen() {
   const { isMobile, isLargeScreen, isXL, isWide, width } = useResponsive();
   const store = useNotesStore();
   const router = useRouter();
-
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const chromePadding = isXL ? 56 : isLargeScreen ? 48 : isMobile ? 24 : 36;
   const editorPadding = isXL ? 40 : isLargeScreen ? 32 : isMobile ? 16 : 24;
@@ -41,34 +41,43 @@ export default function NotaDetailScreen() {
 
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const editorRef = useRef<NoteRichEditorRef>(null);
+  const loadedNoteIdRef = useRef<string | null>(null);
 
   const haptics = useHaptics();
 
   useEffect(() => {
-    if (note) {
-      setTitle(note.title);
-      setContent(note.content);
-    }
-  }, [note?.id]);
+    if (!id) return;
+    getNoteAttachments(id)
+      .then((rows) => setAttachmentUrls(rows.map((row) => row.url)))
+      .catch(() => setAttachmentUrls([]));
+  }, [id]);
+
+  useEffect(() => {
+    loadedNoteIdRef.current = null;
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
-    getNoteAttachments(id)
-      .then((rows) => setImageUrls(rows.map((r) => r.url)))
-      .catch(() => setImageUrls([]));
-  }, [id]);
+    if (loadedNoteIdRef.current === id) return;
+    const current = store.notes.find((n) => n.id === id);
+    if (!current) return;
+    loadedNoteIdRef.current = id;
+    setTitle(current.title);
+    setContent(current.content);
+  }, [id, store.notes]);
 
-  const handleImageUploaded = async (publicUrl: string) => {
+  const handleSave = async () => {
     if (!id) return;
-    await addNoteAttachment(id, publicUrl);
-    setImageUrls((prev) => [...prev, publicUrl]);
-  };
-
-  const handleSave = () => {
-    if (!id) return;
+    let nextContent = content;
+    if (editorRef.current?.hasPendingUploads()) {
+      nextContent = await editorRef.current.flushPendingUploads(id);
+      setContent(nextContent);
+    }
     store.updateNote(id, {
       title: title.trim(),
-      content: content.trim(),
+      content: nextContent,
     });
   };
 
@@ -169,45 +178,22 @@ export default function NotaDetailScreen() {
           underlineColorAndroid="transparent"
           selectionColor={colors.accent}
         />
-        <TextInput
-          style={[
-            styles.contentInput,
-            {
-              color: colors.textPrimary,
-              minHeight: editorMinHeight,
-              fontSize: isLargeScreen ? 19 : 17,
-              lineHeight: isLargeScreen ? 30 : 26,
-            },
-          ]}
-          placeholder="Escribe aquí..."
-          placeholderTextColor={colors.textTertiary}
+        <NoteRichEditor
+          ref={editorRef}
           value={content}
-          onChangeText={setContent}
+          onChange={setContent}
+          noteId={id}
+          placeholder="Escribe aquí..."
+          minHeight={editorMinHeight}
+          fontSize={isLargeScreen ? 19 : 17}
+          lineHeight={isLargeScreen ? 30 : 26}
+          attachmentUrls={attachmentUrls}
           onBlur={handleSave}
-          multiline
-          textAlignVertical="top"
-          underlineColorAndroid="transparent"
-          selectionColor={colors.accent}
+          onAttachmentsChange={(noteId, urls) => {
+            setAttachmentUrls(urls);
+            store.setNoteAttachmentMeta(noteId, urls[0] ?? null, urls.length);
+          }}
         />
-
-        <ImageAttachButton
-          label="Adjuntar a nota"
-          folder="notes"
-          onUploaded={handleImageUploaded}
-        />
-
-        {imageUrls.length > 0 ? (
-          <View style={styles.attachments}>
-            {imageUrls.map((url) => (
-              <RemoteImage
-                key={url}
-                uri={url}
-                style={styles.attachmentImage}
-                recyclingKey={url}
-              />
-            ))}
-          </View>
-        ) : null}
       </ScrollView>
 
       {/* Footer meta */}
@@ -287,16 +273,5 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.subtitle,
-  },
-  attachments: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-  },
-  attachmentImage: {
-    width: 96,
-    height: 96,
-    borderRadius: radius.md,
   },
 });

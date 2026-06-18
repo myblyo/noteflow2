@@ -15,6 +15,8 @@ export interface BaseNote {
 
 export interface Note extends BaseNote {
     content: string;
+    attachmentPreviewUrl?: string | null;
+    attachmentCount?: number;
 }
 
 export interface ChecklistItem {

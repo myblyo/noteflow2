@@ -67,6 +67,7 @@ export async function uploadToS3(
     fileName: string;
     contentType: string;
   },
+  fileBlob?: Blob,
 ): Promise<string> {
   const { uploadUrl, publicUrl } = await requestPresignedUrl(
     options.folder,
@@ -74,8 +75,11 @@ export async function uploadToS3(
     options.contentType,
   );
 
-  const fileResponse = await fetch(localUri);
-  const blob = await fileResponse.blob();
+  let blob = fileBlob;
+  if (!blob) {
+    const fileResponse = await fetch(localUri);
+    blob = await fileResponse.blob();
+  }
 
   const uploadHeaders: Record<string, string> = {
     "Content-Type": options.contentType,
@@ -98,4 +102,21 @@ export async function uploadToS3(
   }
 
   return publicUrl;
+}
+
+/** Sube un Blob/File directamente (web: drag & drop o input file). */
+export async function uploadBlobToS3(
+  blob: Blob,
+  options: {
+    folder: UploadFolder;
+    fileName: string;
+    contentType: string;
+  },
+): Promise<string> {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    return await uploadToS3(objectUrl, options, blob);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

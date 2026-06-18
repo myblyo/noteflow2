@@ -21,7 +21,10 @@ for (const statement of statements) {
     const code = (error as { code?: string }).code;
     const skip =
       (code === "42P07" && statement.includes("RENAME TO checklist_items")) ||
-      (code === "42P01" && statement.includes("RENAME TO checklist_items"));
+      (code === "42P01" && statement.includes("RENAME TO checklist_items")) ||
+      (code === "42P01" && statement.includes("note_attachments")) ||
+      (code === "42804" && statement.includes("note_attachments")) ||
+      (code === "42710" && statement.includes("note_attachments"));
     if (skip) {
       console.log("SKIP:", statement.split("\n")[0]);
       continue;

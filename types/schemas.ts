@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { documentIsEmpty, parseNoteContent } from "../utils/noteDocument";
 
 export const noteSchema = z.object({
     title: z.string().min(1, "El título es obligatorio"),
-    content: z.string().min(1, "El contenido es obligatorio"),
+    content: z.string().refine((value) => !documentIsEmpty(parseNoteContent(value)), {
+        message: "El contenido es obligatorio",
+    }),
 });
 
 export const ideaSchema = z.object({

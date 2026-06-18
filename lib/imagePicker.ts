@@ -4,6 +4,7 @@ export type PickedImage = {
   uri: string;
   mimeType: string;
   fileName: string;
+  blob?: Blob;
 };
 
 type ImagePickerModule = typeof import("expo-image-picker");
@@ -85,4 +86,16 @@ export async function takePhotoWithCamera(): Promise<PickedImage | null> {
     mimeType,
     fileName: asset.fileName ?? fileNameFromUri(asset.uri, mimeType),
   };
+}
+
+/** Web: convierte FileList del explorador o drag & drop en PickedImage[]. */
+export function filesToPickedImages(files: FileList | File[]): PickedImage[] {
+  return Array.from(files)
+    .filter((file) => file.type.startsWith("image/"))
+    .map((file) => ({
+      uri: URL.createObjectURL(file),
+      mimeType: file.type || "image/jpeg",
+      fileName: file.name || `image-${Date.now()}.jpg`,
+      blob: file,
+    }));
 }

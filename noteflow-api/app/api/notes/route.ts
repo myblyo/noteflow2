@@ -21,17 +21,49 @@ const noteSchema = z.object({
     .optional(),
 });
 
+const NOTES_WITH_ATTACHMENTS_SQL = `
+  SELECT n.*,
+    (
+      SELECT na.url
+      FROM note_attachments na
+      WHERE na.note_id = n.id
+      ORDER BY na.created_at ASC
+      LIMIT 1
+    ) AS attachment_preview,
+    (
+      SELECT COUNT(*)::int
+      FROM note_attachments na
+      WHERE na.note_id = n.id
+    ) AS attachment_count
+  FROM notes n
+  WHERE n.user_id = $1
+  ORDER BY n.created_at DESC
+`;
+
+const NOTES_BASIC_SQL = `
+  SELECT n.*,
+    NULL::text AS attachment_preview,
+    0::int AS attachment_count
+  FROM notes n
+  WHERE n.user_id = $1
+  ORDER BY n.created_at DESC
+`;
+
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
   if (isAuthResponse(auth)) return auth;
 
   try {
-    const notes = await query(
-      "SELECT * FROM notes WHERE user_id = $1 ORDER BY created_at DESC",
-      [auth.userId],
-    );
-    return NextResponse.json(notes);
-  } catch {
+    try {
+      const notes = await query(NOTES_WITH_ATTACHMENTS_SQL, [auth.userId]);
+      return NextResponse.json(notes);
+    } catch (attachmentError) {
+      console.error("[notes GET] attachments query failed, fallback:", attachmentError);
+      const notes = await query(NOTES_BASIC_SQL, [auth.userId]);
+      return NextResponse.json(notes);
+    }
+  } catch (error) {
+    console.error("[notes GET]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
@@ -58,7 +90,8 @@ export async function POST(request: Request) {
     await insertNoteRelations(id, tags, items);
     const note = await getNoteWithRelations(id, auth.userId);
     return NextResponse.json(note, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error("[notes POST]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

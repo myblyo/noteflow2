@@ -73,3 +73,8 @@ CREATE TABLE IF NOT EXISTS note_attachments (
   owner_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Alinear note_id con notes.id (UUID en Neon)
+ALTER TABLE note_attachments DROP CONSTRAINT IF EXISTS note_attachments_note_id_fkey;
+ALTER TABLE note_attachments ALTER COLUMN note_id TYPE UUID USING note_id::uuid;
+ALTER TABLE note_attachments ADD CONSTRAINT note_attachments_note_id_fkey FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE;

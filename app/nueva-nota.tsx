@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import {
   View,
@@ -21,6 +21,7 @@ import { useNotesStore } from "../store/noteStore";
 import { DEFAULT_IDEA_COLOR } from "../constants/ideaColors";
 import { IdeaColorPicker } from "../components/IdeaColorPicker";
 import { PageTransition } from "../components/PageTransition";
+import { NoteRichEditor, type NoteRichEditorRef } from "../components/NoteRichEditor";
 import { setSlideForward } from "../utils/navigation";
 
 type NoteFormType = "note" | "checklist" | "idea";
@@ -58,7 +59,9 @@ export default function NuevaNotaScreen() {
     title?: string;
     content?: string;
     description?: string;
+    general?: string;
   }>({});
+  const editorRef = useRef<NoteRichEditorRef>(null);
 
   const handleTypeChange = (newType: NoteFormType) => {
     setType(newType);
@@ -72,10 +75,15 @@ export default function NuevaNotaScreen() {
     try {
       if (type === "note") {
         const data = noteSchema.parse({ title, content });
+        let finalContent = content;
         const newNote = await store.addNote({
           title: data.title,
-          content: data.content,
+          content: finalContent,
         });
+        if (editorRef.current?.hasPendingUploads()) {
+          finalContent = await editorRef.current.flushPendingUploads(newNote.id);
+          await store.updateNote(newNote.id, { title: data.title, content: finalContent });
+        }
         setErrors({});
         setSlideForward();
         router.replace({ pathname: "/nota/[id]", params: { id: newNote.id } });
@@ -117,7 +125,7 @@ export default function NuevaNotaScreen() {
         return;
       }
       if (error instanceof Error) {
-        setErrors({ title: error.message });
+        setErrors({ title: "", content: "", description: "", general: error.message });
       }
     }
   };
@@ -193,25 +201,15 @@ export default function NuevaNotaScreen() {
           {/* Contenido — Note */}
           {type === "note" && (
             <>
-              <TextInput
-                placeholder="Contenido"
-                placeholderTextColor={colors.textTertiary}
+              <NoteRichEditor
+                ref={editorRef}
                 value={content}
-                onChangeText={(v) => {
-                  setContent(v);
+                onChange={(value) => {
+                  setContent(value);
                   setErrors((e) => ({ ...e, content: "" }));
                 }}
-                multiline
-                style={{
-                  color: colors.textPrimary,
-                  minHeight: 120,
-                  textAlignVertical: "top",
-                  borderBottomWidth: 1,
-                  borderColor: errors.content ? "red" : colors.divider,
-                  marginBottom: 4,
-                  paddingVertical: 8,
-                  fontSize: 15,
-                }}
+                placeholder="Contenido"
+                minHeight={120}
               />
               {errors.content ? (
                 <Text style={{ color: "red", fontSize: 12 }}>{errors.content}</Text>
@@ -260,6 +258,11 @@ export default function NuevaNotaScreen() {
           )}
 
           {/* Guardar */}
+          {errors.general ? (
+            <Text style={{ color: "red", fontSize: 13, marginTop: 16 }}>
+              {errors.general}
+            </Text>
+          ) : null}
           <Pressable
             onPress={handleSave}
             style={{

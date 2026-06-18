@@ -5,6 +5,8 @@ import { useRouter } from "expo-router";
 
 import { useThemeColors } from "../hooks/useTheme";
 import { radius } from "../constants/theme";
+import { useAuthStore } from "../store/authStore";
+import { RemoteImage } from "./RemoteImage";
 
 type ProfileNavButtonProps = {
   size?: number;
@@ -14,6 +16,8 @@ type ProfileNavButtonProps = {
 export function ProfileNavButton({ size = 40, style }: ProfileNavButtonProps) {
   const colors = useThemeColors();
   const router = useRouter();
+  const avatarUrl = useAuthStore((s) => s.user?.avatarUrl);
+  const iconSize = Math.max(20, Math.round(size * 0.55));
 
   return (
     <Pressable
@@ -30,7 +34,20 @@ export function ProfileNavButton({ size = 40, style }: ProfileNavButtonProps) {
         style,
       ]}
     >
-      <Ionicons name="person-circle-outline" size={24} color={colors.accent} />
+      {avatarUrl ? (
+        <RemoteImage
+          uri={avatarUrl}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+          }}
+          contentFit="cover"
+          recyclingKey={avatarUrl}
+        />
+      ) : (
+        <Ionicons name="person-circle-outline" size={iconSize} color={colors.accent} />
+      )}
     </Pressable>
   );
 }
@@ -41,5 +58,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    overflow: "hidden",
   },
 });
