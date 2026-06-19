@@ -6,7 +6,7 @@ import {
   NoteAttachmentSection,
   type NoteAttachmentSectionRef,
 } from "../NoteAttachmentSection";
-import { RemoteImage } from "../RemoteImage";
+import { NativeNoteImageCanvas } from "../NativeNoteImageCanvas";
 import type { ImageBlock } from "../../types/noteDocument";
 import {
   documentHasPendingUploads,
@@ -19,6 +19,7 @@ import {
   serializeNoteDocument,
 } from "../../utils/noteDocument";
 import { newBlockId } from "../../utils/noteDocument";
+import { updateImageBlock } from "../../utils/noteDocumentEdits";
 import { flushDocumentUploads } from "../../lib/noteImageUpload";
 import type { NoteRichEditorRef } from "./types";
 
@@ -86,6 +87,16 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
       onChange(serialized);
     };
 
+    const handleImageMove = (imageId: string, x: number, y: number) => {
+      let doc = parseNoteContent(value);
+      doc = updateImageBlock(doc, imageId, {
+        wrap: "free",
+        x: Math.round(x),
+        y: Math.round(y),
+      });
+      onChange(serializeNoteDocument(doc));
+    };
+
     useImperativeHandle(
       ref,
       () => ({
@@ -118,7 +129,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
     return (
       <View style={styles.root}>
         <Text style={[styles.nativeHint, { color: colors.textTertiary }]}>
-          En móvil, las imágenes se muestran debajo del texto. En web puedes insertarlas en línea.
+          Mantén pulsada una imagen y arrástrala para colocarla donde quieras.
         </Text>
         <TextInput
           style={[
@@ -143,16 +154,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
         />
 
         {images.length > 0 ? (
-          <View style={styles.inlinePreview}>
-            {images.map((image) => (
-              <RemoteImage
-                key={image.id}
-                uri={image.url}
-                style={[styles.previewImage, { borderColor: colors.border }]}
-                contentFit="cover"
-              />
-            ))}
-          </View>
+          <NativeNoteImageCanvas images={images} onImageMove={handleImageMove} />
         ) : null}
 
         <NoteAttachmentSection
@@ -183,17 +185,5 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: "transparent",
     outlineStyle: "none" as never,
-  },
-  inlinePreview: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  previewImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
   },
 });

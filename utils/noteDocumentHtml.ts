@@ -112,6 +112,9 @@ export function injectEditorStyles() {
       outline: 2px solid #6366f1;
       outline-offset: 1px;
     }
+    .nf-doc-editor .nf-image.nf-wrap-free {
+      touch-action: none;
+    }
     .nf-doc-editor .nf-image.nf-wrap-free.nf-selected {
       cursor: grab;
     }

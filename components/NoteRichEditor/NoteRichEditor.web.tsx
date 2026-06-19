@@ -316,12 +316,12 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
     }, [selectedImageId]);
 
     useEffect(() => {
-      const onMouseMove = (event: MouseEvent) => {
+      const handlePointerMove = (clientX: number, clientY: number) => {
         const editor = editorRef.current;
         if (!editor) return;
 
         if (resizeRef.current) {
-          const delta = event.clientX - resizeRef.current.startX;
+          const delta = clientX - resizeRef.current.startX;
           const width = Math.max(
             MIN_IMAGE_WIDTH,
             Math.min(MAX_IMAGE_WIDTH, resizeRef.current.startWidth + delta),
@@ -338,14 +338,14 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           const span = findImageSpan(editor, freeDragRef.current.id);
           if (!span) return;
 
-          freeDragRef.current.lastX = event.clientX;
-          freeDragRef.current.lastY = event.clientY;
+          freeDragRef.current.lastX = clientX;
+          freeDragRef.current.lastY = clientY;
 
           if (!freeDragRef.current.begun) {
-            const dx = Math.abs(event.clientX - freeDragRef.current.startX);
-            const dy = Math.abs(event.clientY - freeDragRef.current.startY);
+            const dx = Math.abs(clientX - freeDragRef.current.startX);
+            const dy = Math.abs(clientY - freeDragRef.current.startY);
             if (dx > 3 || dy > 3) {
-              const begun = beginFreeImageDrag(editor, span, event.clientX, event.clientY);
+              const begun = beginFreeImageDrag(editor, span, clientX, clientY);
               freeDragRef.current.begun = true;
               freeDragRef.current.moved = true;
               freeDragRef.current.placeholder = begun.placeholder;
@@ -358,15 +358,15 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           updateFreeImageDragPosition(
             editor,
             span,
-            event.clientX,
-            event.clientY,
+            clientX,
+            clientY,
             freeDragRef.current.offsetX,
             freeDragRef.current.offsetY,
           );
         }
       };
 
-      const onMouseUp = () => {
+      const handlePointerEnd = () => {
         const editor = editorRef.current;
         if (freeDragRef.current && editor) {
           const span = findImageSpan(editor, freeDragRef.current.id);
@@ -389,18 +389,49 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
         freeDragRef.current = null;
       };
 
+      const onMouseMove = (event: MouseEvent) => {
+        handlePointerMove(event.clientX, event.clientY);
+      };
+
+      const onMouseUp = () => {
+        handlePointerEnd();
+      };
+
+      const onTouchMove = (event: TouchEvent) => {
+        const touch = event.touches[0];
+        if (!touch) return;
+        if (freeDragRef.current || resizeRef.current) {
+          event.preventDefault();
+        }
+        handlePointerMove(touch.clientX, touch.clientY);
+      };
+
+      const onTouchEnd = () => {
+        handlePointerEnd();
+      };
+
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+      window.addEventListener("touchend", onTouchEnd);
+      window.addEventListener("touchcancel", onTouchEnd);
       return () => {
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
+        window.removeEventListener("touchmove", onTouchMove);
+        window.removeEventListener("touchend", onTouchEnd);
+        window.removeEventListener("touchcancel", onTouchEnd);
       };
     }, [emitFromEditor]);
 
-    const handleEditorMouseDown = (event: MouseEvent) => {
+    const startImageInteraction = (
+      clientX: number,
+      clientY: number,
+      target: HTMLElement,
+      touch: boolean,
+    ) => {
       const editor = editorRef.current;
       if (!editor) return;
-      const target = event.target as HTMLElement;
       const span = target.closest(`span.${"nf-image"}`) as HTMLSpanElement | null;
       if (!span) return;
 
@@ -408,25 +439,22 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
       setSelectedImageId(block.id);
       setImageSelection(editor, block.id);
 
-      const handle = target.dataset.resize === "true";
-      if (handle) {
-        event.preventDefault();
+      if (!touch && target.dataset.resize === "true") {
         resizeRef.current = {
           id: block.id,
-          startX: event.clientX,
+          startX: clientX,
           startWidth: block.width,
         };
         return;
       }
 
-      if (block.wrap === "free") {
-        event.preventDefault();
+      if (block.wrap === "free" || touch) {
         freeDragRef.current = {
           id: block.id,
-          startX: event.clientX,
-          startY: event.clientY,
-          lastX: event.clientX,
-          lastY: event.clientY,
+          startX: clientX,
+          startY: clientY,
+          lastX: clientX,
+          lastY: clientY,
           offsetX: 0,
           offsetY: 0,
           moved: false,
@@ -434,6 +462,24 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           placeholder: null,
         };
       }
+    };
+
+    const handleEditorMouseDown = (event: MouseEvent) => {
+      startImageInteraction(
+        event.clientX,
+        event.clientY,
+        event.target as HTMLElement,
+        false,
+      );
+    };
+
+    const handleEditorTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      const target = touch.target as HTMLElement;
+      if (!target.closest(`span.${"nf-image"}`)) return;
+      event.preventDefault();
+      startImageInteraction(touch.clientX, touch.clientY, target, true);
     };
 
     const handleEditorClick = (event: MouseEvent) => {
@@ -591,6 +637,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           },
           onClick: handleEditorClick,
           onMouseDown: handleEditorMouseDown,
+          onTouchStart: handleEditorTouchStart,
           onDragOver: (e: DragEvent) => {
             e.preventDefault();
             if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
