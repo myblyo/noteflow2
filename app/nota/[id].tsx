@@ -10,6 +10,7 @@ import { goBack } from "../../utils/navigation";
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
+import { scrollContentGutter, scrollViewProps, scrollViewWebStyle } from "../../constants/sharedStyles";
 
 import { Alert } from "react-native";
 import { useHaptics } from "../../hooks/useHaptics";
@@ -154,16 +155,16 @@ export default function NotaDetailScreen() {
 
       {/* Editor */}
       <ScrollView
-        style={styles.editorScroll}
+        style={[styles.editorScroll, scrollViewWebStyle]}
         contentContainerStyle={[
           styles.editorContainer,
+          scrollContentGutter,
           {
             paddingHorizontal: editorPadding,
             paddingBottom: spacing.xxl * 2,
           },
         ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator
+        {...scrollViewProps}
         keyboardDismissMode="interactive"
       >
         <TextInput

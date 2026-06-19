@@ -1,6 +1,24 @@
 import { StyleSheet, Platform } from "react-native";
 import { spacing, radius, typography } from "./theme";
 
+/** Espacio extra a la derecha en web para que la barra de scroll no tape el texto. */
+export const scrollContentGutter = Platform.select({
+  web: { paddingRight: spacing.xxl + 8 },
+  default: {},
+});
+
+/** Props comunes para ScrollView de contenido largo (notas, editor, etc.). */
+export const scrollViewProps = {
+  keyboardShouldPersistTaps: "handled" as const,
+  showsVerticalScrollIndicator: true,
+  nestedScrollEnabled: true,
+};
+
+export const scrollViewWebStyle = Platform.select({
+  web: { scrollbarGutter: "stable" as const },
+  default: {},
+});
+
 /**
  * Shared styles used by multiple tab screens.
  * Keeps the individual screen files lean and consistent.

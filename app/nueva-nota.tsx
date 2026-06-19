@@ -16,6 +16,7 @@ import { DETAIL_FALLBACKS } from "../utils/routes";
 import { z } from "zod";
 
 import { useThemeColors } from "../hooks/useTheme";
+import { scrollContentGutter, scrollViewProps, scrollViewWebStyle } from "../constants/sharedStyles";
 import { noteSchema, checklistSchema, ideaSchema } from "../types/schemas";
 import { useNotesStore } from "../store/noteStore";
 import { DEFAULT_IDEA_COLOR } from "../constants/ideaColors";
@@ -139,10 +140,9 @@ export default function NuevaNotaScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator
+          style={[{ flex: 1 }, scrollViewWebStyle]}
+          contentContainerStyle={[{ padding: 20, paddingBottom: 40 }, scrollContentGutter]}
+          {...scrollViewProps}
         >
           <BackButton fallback={backFallback} style={{ marginBottom: 16 }} />
           <Text style={{ color: colors.textPrimary, fontSize: 20, marginBottom: 20 }}>

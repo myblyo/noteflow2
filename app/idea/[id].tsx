@@ -10,6 +10,7 @@ import { goBack } from "../../utils/navigation";
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
+import { scrollContentGutter, scrollViewProps, scrollViewWebStyle } from "../../constants/sharedStyles";
 import { FavoriteStarButton } from "../../components/FavoriteStarButton";
 import { formatDate } from "../../utils/formatDate";
 import { PageTransition } from "../../components/PageTransition";
@@ -89,10 +90,9 @@ export default function IdeaDetailScreen() {
 
       {/* Content */}
       <ScrollView
-        style={styles.editorScroll}
-        contentContainerStyle={styles.editorContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator
+        style={[styles.editorScroll, scrollViewWebStyle]}
+        contentContainerStyle={[styles.editorContainer, scrollContentGutter]}
+        {...scrollViewProps}
       >
         <View style={styles.colorHeader}>
           <IdeaColorDot color={idea.color} size={32} />
@@ -120,6 +120,7 @@ export default function IdeaDetailScreen() {
           onChangeText={setDescription}
           onBlur={handleSave}
           multiline
+          scrollEnabled={false}
           textAlignVertical="top"
           underlineColorAndroid="transparent"
           selectionColor={colors.accent}

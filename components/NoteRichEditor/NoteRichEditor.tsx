@@ -135,6 +135,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           onChangeText={handleTextChange}
           onBlur={onBlur}
           multiline
+          scrollEnabled={false}
           textAlignVertical="top"
           underlineColorAndroid="transparent"
           selectionColor={colors.accent}

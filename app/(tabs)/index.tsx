@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
-import { sharedStyles } from "../../constants/sharedStyles";
+import { sharedStyles, scrollContentGutter, scrollViewProps, scrollViewWebStyle } from "../../constants/sharedStyles";
 import type { Note, IdeaNote } from "../../types";
 import { filterNotes, filterIdeas, filterChecklists } from "../../utils/filterItems";
 import {
@@ -63,7 +63,6 @@ export default function DashboardScreen() {
     sidePanelWidth,
     editorTitleSize,
     editorBodySize,
-    centerPanelMinHeight,
     centerPanelPadding,
     listContainerFlex,
   } = useResponsive();
@@ -365,16 +364,15 @@ export default function DashboardScreen() {
         styles.centerPanel,
         {
           flex: 1,
-          minHeight: isMobile ? undefined : centerPanelMinHeight,
+          minHeight: 0,
           paddingHorizontal: centerPanelPadding,
         },
       ]}
     >
       <ScrollView
-        style={styles.editorScroll}
-        contentContainerStyle={styles.editorScrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator
+        style={[styles.editorScroll, scrollViewWebStyle]}
+        contentContainerStyle={[styles.editorScrollContent, scrollContentGutter]}
+        {...scrollViewProps}
       >
         <TextInput
           style={[styles.editorTitle, { color: colors.textPrimary, fontSize: editorTitleSize }]}
@@ -499,7 +497,7 @@ export default function DashboardScreen() {
   );
 
   const mobileLayout = (
-    <View style={[dashboardBody, { flexDirection: "column", flex: 1 }]}>
+    <View style={[dashboardBody, { flexDirection: "column", flex: 1, minHeight: 0 }]}>
       <View style={styles.mobileHeader}>
         <Pressable
           onPress={() => setDrawerOpen(true)}
