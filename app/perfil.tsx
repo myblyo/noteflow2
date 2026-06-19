@@ -37,18 +37,20 @@ export default function ProfileScreen() {
   }, [user?.bio]);
 
   const savedAvatarUrl = user?.avatarUrl ?? null;
+  const pendingHttpAvatar =
+    pendingAvatarUrl && !pendingAvatarUrl.startsWith("blob:")
+      ? pendingAvatarUrl
+      : null;
   const displayAvatarUrl = pendingAvatarUrl ?? savedAvatarUrl;
   const avatarChanged =
-    pendingAvatarUrl !== null &&
-    pendingAvatarUrl !== savedAvatarUrl &&
-    !pendingAvatarUrl.startsWith("blob:");
+    pendingHttpAvatar !== null && pendingHttpAvatar !== savedAvatarUrl;
   const bioChanged = bio.trim() !== (user?.bio ?? "");
   const hasChanges = avatarChanged || bioChanged;
 
   const handleAvatarUploaded = async (publicUrl: string) => {
-    setPendingAvatarUrl(publicUrl);
     if (!user) return;
 
+    setPendingAvatarUrl(publicUrl);
     setSaving(true);
     try {
       if (Platform.OS === "web") {
@@ -84,7 +86,9 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       const patch: { avatarUrl?: string; bio?: string } = {};
-      if (avatarChanged && pendingAvatarUrl) patch.avatarUrl = pendingAvatarUrl;
+      if (avatarChanged && pendingHttpAvatar) {
+        patch.avatarUrl = pendingHttpAvatar;
+      }
       if (bioChanged) patch.bio = bio.trim();
 
       if (Platform.OS === "web") {
@@ -93,8 +97,8 @@ export default function ProfileScreen() {
           id: updated.id,
           email: updated.email,
           name: updated.name,
-          bio: updated.bio ?? "",
-          avatarUrl: updated.avatarUrl ?? null,
+          bio: updated.bio ?? bio.trim(),
+          avatarUrl: updated.avatarUrl ?? patch.avatarUrl ?? savedAvatarUrl,
         });
       } else {
         await updateUserProfile(user.id, patch);
@@ -104,7 +108,10 @@ export default function ProfileScreen() {
           avatarUrl: patch.avatarUrl ?? user.avatarUrl,
         });
       }
-      setPendingAvatarUrl(null);
+
+      if (patch.avatarUrl || !pendingAvatarUrl?.startsWith("blob:")) {
+        setPendingAvatarUrl(null);
+      }
       Alert.alert("Listo", "Cambios guardados");
     } catch (error) {
       Alert.alert(
