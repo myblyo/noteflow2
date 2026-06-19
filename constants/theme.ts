@@ -126,10 +126,14 @@ export const radius = {
 
 import { Platform } from "react-native";
 
+/** Fuente sans-serif del sistema en web (evita Times New Roman en inputs/editores). */
+export const WEB_FONT_STACK =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
 const fontStack = Platform.select({
   ios: "System",
   android: "Roboto",
-  default: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'SF Pro', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  default: WEB_FONT_STACK,
 });
 
 export const typography = {

@@ -7,6 +7,7 @@ import { AppShell } from "../components/AppShell";
 import { TRANSITION } from "../constants/transitions";
 import { fetchUserProfile, mapFirebaseUser } from "../lib/firebaseAuth";
 import { useAuthStore } from "../store/authStore";
+import { injectWebGlobalStyles } from "../utils/injectWebGlobalStyles";
 
 const PUBLIC_ROUTES = new Set(["login", "register"]);
 
@@ -24,6 +25,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (Platform.OS === "web") {
+      injectWebGlobalStyles();
       initWeb().finally(() => setCheckingAuth(false));
       return;
     }

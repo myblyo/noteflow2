@@ -6,6 +6,7 @@ import type {
   NoteDocument,
 } from "../types/noteDocument";
 import { resolveMediaUrl } from "../lib/mediaUrl";
+import { WEB_FONT_STACK } from "../constants/theme";
 import { emptyDocument, newBlockId } from "./noteDocument";
 
 const IMAGE_CLASS = "nf-image";
@@ -23,6 +24,7 @@ export function injectEditorStyles() {
       position: relative;
       display: flow-root;
       background: transparent;
+      font-family: ${WEB_FONT_STACK};
     }
     .nf-doc-editor:focus {
       outline: none;

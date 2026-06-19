@@ -10,7 +10,7 @@ import React, {
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../../hooks/useTheme";
-import { radius, spacing } from "../../constants/theme";
+import { radius, spacing, typography } from "../../constants/theme";
 import type { ImageAlign, ImageBlock, ImageWrapMode, NoteDocument } from "../../types/noteDocument";
 import {
   documentHasPendingUploads,
@@ -668,6 +668,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
             padding: 0,
             backgroundColor: "transparent",
             color: colors.textPrimary,
+            fontFamily: typography.body.fontFamily,
             fontSize,
             lineHeight: `${lineHeight}px`,
             boxSizing: "border-box",
