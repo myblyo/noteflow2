@@ -160,9 +160,10 @@ export default function NotaDetailScreen() {
           {
             paddingHorizontal: editorPadding,
             paddingBottom: spacing.xxl * 2,
-            minHeight: editorMinHeight,
           },
         ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
         keyboardDismissMode="interactive"
       >
         <TextInput
@@ -218,6 +219,7 @@ export default function NotaDetailScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    minHeight: 0,
   },
   header: {
     flexDirection: "row",
@@ -235,6 +237,7 @@ const styles = StyleSheet.create({
   },
   editorScroll: {
     flex: 1,
+    minHeight: 0,
   },
   editorContainer: {
     paddingTop: spacing.xl,

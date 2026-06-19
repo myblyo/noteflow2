@@ -91,6 +91,8 @@ export default function IdeaDetailScreen() {
       <ScrollView
         style={styles.editorScroll}
         contentContainerStyle={styles.editorContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
       >
         <View style={styles.colorHeader}>
           <IdeaColorDot color={idea.color} size={32} />
@@ -157,6 +159,7 @@ export default function IdeaDetailScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    minHeight: 0,
   },
   header: {
     flexDirection: "row",
@@ -175,10 +178,12 @@ const styles = StyleSheet.create({
   },
   editorScroll: {
     flex: 1,
+    minHeight: 0,
   },
   editorContainer: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
     flexGrow: 1,
   },
   colorHeader: {

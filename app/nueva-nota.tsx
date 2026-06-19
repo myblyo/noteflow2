@@ -139,8 +139,10 @@ export default function NuevaNotaScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
-          contentContainerStyle={{ padding: 20 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
         >
           <BackButton fallback={backFallback} style={{ marginBottom: 16 }} />
           <Text style={{ color: colors.textPrimary, fontSize: 20, marginBottom: 20 }}>

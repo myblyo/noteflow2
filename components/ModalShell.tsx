@@ -23,6 +23,7 @@ export function ModalShell({ children, style, maxWidth }: ModalShellProps) {
         style={[
           {
             flex: 1,
+            minHeight: 0,
             width: "100%",
             maxWidth: isMobile ? undefined : resolvedMaxWidth,
             alignSelf: "center",

@@ -625,7 +625,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
 );
 
 const styles = StyleSheet.create({
-  root: { width: "100%", flex: 1 },
+  root: { width: "100%" },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",

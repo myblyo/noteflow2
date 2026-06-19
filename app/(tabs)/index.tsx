@@ -370,28 +370,35 @@ export default function DashboardScreen() {
         },
       ]}
     >
-      <TextInput
-        style={[styles.editorTitle, { color: colors.textPrimary, fontSize: editorTitleSize }]}
-        placeholder="Add title ..."
-        placeholderTextColor={colors.textTertiary}
-        value={editorTitle}
-        onChangeText={setEditorTitle}
-        onBlur={handleSaveEditor}
-        underlineColorAndroid="transparent"
-        selectionColor={colors.accent}
-      />
-      <NoteRichEditor
-        ref={editorRef}
-        value={editorContent}
-        onChange={setEditorContent}
-        noteId={store.selectedNoteId}
-        placeholder="Start writing..."
-        fontSize={editorBodySize}
-        onBlur={handleSaveEditor}
-        onAttachmentsChange={(noteId, urls) => {
-          store.setNoteAttachmentMeta(noteId, urls[0] ?? null, urls.length);
-        }}
-      />
+      <ScrollView
+        style={styles.editorScroll}
+        contentContainerStyle={styles.editorScrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
+      >
+        <TextInput
+          style={[styles.editorTitle, { color: colors.textPrimary, fontSize: editorTitleSize }]}
+          placeholder="Add title ..."
+          placeholderTextColor={colors.textTertiary}
+          value={editorTitle}
+          onChangeText={setEditorTitle}
+          onBlur={handleSaveEditor}
+          underlineColorAndroid="transparent"
+          selectionColor={colors.accent}
+        />
+        <NoteRichEditor
+          ref={editorRef}
+          value={editorContent}
+          onChange={setEditorContent}
+          noteId={store.selectedNoteId}
+          placeholder="Start writing..."
+          fontSize={editorBodySize}
+          onBlur={handleSaveEditor}
+          onAttachmentsChange={(noteId, urls) => {
+            store.setNoteAttachmentMeta(noteId, urls[0] ?? null, urls.length);
+          }}
+        />
+      </ScrollView>
     </View>
   );
 
@@ -541,9 +548,17 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   centerPanel: {
     flex: 1,
+    minHeight: 0,
     paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
     minWidth: 0,
+  },
+  editorScroll: {
+    flex: 1,
+  },
+  editorScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xxl,
   },
   editorTitle: {
     ...typography.title,

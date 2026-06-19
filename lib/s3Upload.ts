@@ -84,10 +84,7 @@ export async function uploadToS3(
   const uploadHeaders: Record<string, string> = {
     "Content-Type": options.contentType,
   };
-  if (
-    uploadUrl.includes("/api/uploads/local") ||
-    uploadUrl.includes("/api/uploads/blob")
-  ) {
+  if (uploadUrl.includes("/api/uploads/local")) {
     Object.assign(uploadHeaders, await getAuthHeader());
   }
 
@@ -102,15 +99,6 @@ export async function uploadToS3(
     throw new Error(
       detail ? `No se pudo subir la imagen (${uploadResponse.status})` : "No se pudo subir la imagen",
     );
-  }
-
-  if (uploadUrl.includes("/api/uploads/blob")) {
-    try {
-      const body = (await uploadResponse.json()) as { publicUrl?: string };
-      if (body.publicUrl) return body.publicUrl;
-    } catch {
-      /* fallback */
-    }
   }
 
   return publicUrl;
