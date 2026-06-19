@@ -8,8 +8,8 @@ NoteFlow sube imágenes (avatar y adjuntos de notas) a **Amazon S3** usando **Pr
 
 ```
 App autenticada
-    → POST /api/uploads/presign  (API genera URL firmada)
-    → PUT directo a S3           (app sube el archivo)
+    → POST /api/uploads/direct (web) o /api/uploads/presign (móvil)
+    → S3 (desde la API en web, evita CORS)
     → Guarda publicUrl en Firestore (avatar) o PostgreSQL (adjuntos)
 ```
 

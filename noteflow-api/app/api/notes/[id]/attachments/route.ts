@@ -10,7 +10,7 @@ import { isAuthResponse, requireAuth } from "@/lib/require-auth";
 type RouteContext = { params: Promise<{ id: string }> };
 
 const attachmentSchema = z.object({
-  url: z.string().url(),
+  url: z.string().min(1),
 });
 
 export async function GET(_request: Request, { params }: RouteContext) {

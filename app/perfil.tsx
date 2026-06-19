@@ -47,18 +47,23 @@ export default function ProfileScreen() {
 
   const handleAvatarUploaded = async (publicUrl: string) => {
     setPendingAvatarUrl(publicUrl);
-    if (!user || Platform.OS !== "web") return;
+    if (!user) return;
 
     setSaving(true);
     try {
-      const updated = await api.updateProfile({ avatarUrl: publicUrl });
-      await setSession({
-        id: updated.id,
-        email: updated.email,
-        name: updated.name,
-        bio: updated.bio ?? bio.trim(),
-        avatarUrl: updated.avatarUrl ?? publicUrl,
-      });
+      if (Platform.OS === "web") {
+        const updated = await api.updateProfile({ avatarUrl: publicUrl });
+        await setSession({
+          id: updated.id,
+          email: updated.email,
+          name: updated.name,
+          bio: updated.bio ?? bio.trim(),
+          avatarUrl: updated.avatarUrl ?? publicUrl,
+        });
+      } else {
+        await updateUserProfile(user.id, { avatarUrl: publicUrl });
+        await setSession({ ...user, avatarUrl: publicUrl });
+      }
       setPendingAvatarUrl(null);
     } catch (error) {
       Alert.alert(

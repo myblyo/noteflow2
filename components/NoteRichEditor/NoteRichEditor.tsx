@@ -33,6 +33,7 @@ type NoteRichEditorProps = {
   fontSize?: number;
   lineHeight?: number;
   onAttachmentsChange?: (noteId: string, urls: string[]) => void;
+  onAutoPersist?: (content: string) => void;
   attachmentUrls?: string[];
   onBlur?: () => void;
 };

@@ -395,6 +395,12 @@ export default function DashboardScreen() {
           onAttachmentsChange={(noteId, urls) => {
             store.setNoteAttachmentMeta(noteId, urls[0] ?? null, urls.length);
           }}
+          onAutoPersist={(serialized) => {
+            setEditorContent(serialized);
+            if (store.selectedNoteId) {
+              void store.updateNote(store.selectedNoteId, { content: serialized });
+            }
+          }}
         />
       </ScrollView>
     </View>

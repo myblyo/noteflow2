@@ -195,6 +195,10 @@ export default function NotaDetailScreen() {
             setAttachmentUrls(urls);
             store.setNoteAttachmentMeta(noteId, urls[0] ?? null, urls.length);
           }}
+          onAutoPersist={(serialized) => {
+            setContent(serialized);
+            if (id) void store.updateNote(id, { content: serialized });
+          }}
         />
       </ScrollView>
 

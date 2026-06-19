@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { createElement, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   View,
   type StyleProp,
@@ -18,8 +19,17 @@ type RemoteImageProps = {
   recyclingKey?: string;
 };
 
+function flattenSize(style: StyleProp<ViewStyle>): { width?: number; height?: number; borderRadius?: number } {
+  const flat = StyleSheet.flatten(style) ?? {};
+  return {
+    width: typeof flat.width === "number" ? flat.width : undefined,
+    height: typeof flat.height === "number" ? flat.height : undefined,
+    borderRadius: typeof flat.borderRadius === "number" ? flat.borderRadius : undefined,
+  };
+}
+
 /**
- * Imagen remota con caché (expo-image) y placeholder mientras descarga desde S3/AWS.
+ * Imagen remota con caché y placeholder. En web usa <img> nativo (mejor con S3).
  */
 export function RemoteImage({
   uri,
@@ -38,6 +48,45 @@ export function RemoteImage({
         {placeholder ?? (
           <ActivityIndicator size="small" color={colors.accent} />
         )}
+      </View>
+    );
+  }
+
+  if (Platform.OS === "web") {
+    const size = flattenSize(style);
+    const objectFit = contentFit === "contain" ? "contain" : "cover";
+    return (
+      <View style={[styles.wrap, style]}>
+        {createElement("img", {
+          key: recyclingKey ?? uri,
+          src: uri,
+          alt: "",
+          onLoad: () => {
+            setFailed(false);
+            setLoading(false);
+          },
+          onError: () => {
+            setLoading(false);
+            setFailed(true);
+          },
+          style: {
+            width: size.width ?? "100%",
+            height: size.height ?? "100%",
+            objectFit,
+            borderRadius: size.borderRadius,
+            display: "block",
+          },
+        })}
+        {loading ? (
+          <View style={[styles.overlay, { backgroundColor: colors.surface }]}>
+            <ActivityIndicator size="small" color={colors.accent} />
+          </View>
+        ) : null}
+        {failed ? (
+          <View style={[styles.overlay, { backgroundColor: colors.surfaceSecondary }]}>
+            <Ionicons name="image-outline" size={22} color={colors.textTertiary} />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -85,7 +134,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   overlay: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
     opacity: 0.85,

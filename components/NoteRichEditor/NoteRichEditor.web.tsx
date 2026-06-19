@@ -55,6 +55,7 @@ type NoteRichEditorProps = {
   fontSize?: number;
   lineHeight?: number;
   onAttachmentsChange?: (noteId: string, urls: string[]) => void;
+  onAutoPersist?: (content: string) => void;
   attachmentUrls?: string[];
   onBlur?: () => void;
 };
@@ -73,6 +74,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
       fontSize = 17,
       lineHeight = 26,
       onAttachmentsChange,
+      onAutoPersist,
       attachmentUrls = [],
       onBlur,
     },
@@ -108,7 +110,13 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
       const serialized = serializeNoteDocument(next);
       onChange(serialized);
       if (noteId) onAttachmentsChange?.(noteId, getSavedImageUrls(serialized));
+      return serialized;
     }, [noteId, onChange, onAttachmentsChange]);
+
+    const persistAfterUpload = useCallback(() => {
+      const serialized = emitFromEditor();
+      if (serialized && noteId) onAutoPersist?.(serialized);
+    }, [emitFromEditor, noteId, onAutoPersist]);
 
     const syncDocumentToEditor = useCallback((doc: NoteDocument) => {
       const editor = editorRef.current;
@@ -143,7 +151,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           const uploaded = await uploadImageBlock(block, noteId, file);
           const editor = editorRef.current;
           if (editor) updateImageInEditor(editor, uploaded);
-          emitFromEditor();
+          persistAfterUpload();
           return uploaded;
         } catch (error) {
           const failed: ImageBlock = {
@@ -153,11 +161,11 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           };
           const editor = editorRef.current;
           if (editor) updateImageInEditor(editor, failed);
-          emitFromEditor();
+          persistAfterUpload();
           return failed;
         }
       },
-      [emitFromEditor, noteId],
+      [emitFromEditor, noteId, persistAfterUpload],
     );
 
     const addImagesFromFiles = useCallback(
@@ -197,10 +205,10 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
             blobsRef.current.delete(block.id);
             applyImageDataset(widget, uploaded);
           }
-          emitFromEditor();
+          persistAfterUpload();
         }
       },
-      [emitFromEditor, noteId, uploadAndPatchImage],
+      [emitFromEditor, noteId, persistAfterUpload, uploadAndPatchImage],
     );
 
     useImperativeHandle(

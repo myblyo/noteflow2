@@ -1,10 +1,10 @@
 /**
  * Flujo seguro de subida a S3:
- * 1. App pide Presigned URL al backend (usuario autenticado)
- * 2. Backend genera URL temporal firmada por AWS
- * 3. App sube el archivo con PUT directamente a S3
- * 4. App guarda la URL pública en Firestore (avatar) o PostgreSQL (adjunto)
+ * 1. App pide URL al backend (presign) o sube directo (web → /uploads/direct)
+ * 2. Backend verifica sesión y escribe en S3 (o almacenamiento local en dev)
+ * 3. App guarda la URL pública en PostgreSQL / Firestore
  */
+import { Platform } from "react-native";
 import { resolveApiBaseUrl } from "./apiBaseUrl";
 
 const BASE_URL = resolveApiBaseUrl();
@@ -13,6 +13,11 @@ export type UploadFolder = "avatars" | "notes";
 
 type PresignResponse = {
   uploadUrl: string;
+  publicUrl: string;
+  key: string;
+};
+
+type DirectUploadResponse = {
   publicUrl: string;
   key: string;
 };
@@ -59,7 +64,43 @@ async function requestPresignedUrl(
   return res.json() as Promise<PresignResponse>;
 }
 
-/** Pasos 1–3: presigned URL + PUT a S3. Devuelve la URL pública. */
+/** Web/Vercel: sube por la API (sin CORS hacia S3). Móvil: presign + PUT. */
+async function uploadDirect(
+  blob: Blob,
+  options: {
+    folder: UploadFolder;
+    fileName: string;
+    contentType: string;
+  },
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", blob, options.fileName);
+  formData.append("folder", options.folder);
+  formData.append("contentType", options.contentType);
+
+  const headers = await getAuthHeader();
+  const res = await fetch(`${BASE_URL}/uploads/direct`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let message = `Error ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      message = body.error ?? message;
+    } catch {
+      /* respuesta no JSON */
+    }
+    throw new Error(message);
+  }
+
+  const data = (await res.json()) as DirectUploadResponse;
+  return data.publicUrl;
+}
+
+/** Pasos 1–3: subida + URL pública. */
 export async function uploadToS3(
   localUri: string,
   options: {
@@ -69,17 +110,21 @@ export async function uploadToS3(
   },
   fileBlob?: Blob,
 ): Promise<string> {
-  const { uploadUrl, publicUrl } = await requestPresignedUrl(
-    options.folder,
-    options.fileName,
-    options.contentType,
-  );
-
   let blob = fileBlob;
   if (!blob) {
     const fileResponse = await fetch(localUri);
     blob = await fileResponse.blob();
   }
+
+  if (Platform.OS === "web") {
+    return uploadDirect(blob, options);
+  }
+
+  const { uploadUrl, publicUrl } = await requestPresignedUrl(
+    options.folder,
+    options.fileName,
+    options.contentType,
+  );
 
   const uploadHeaders: Record<string, string> = {
     "Content-Type": options.contentType,
@@ -99,7 +144,7 @@ export async function uploadToS3(
     const isS3 = uploadUrl.includes("amazonaws.com");
     throw new Error(
       isS3
-        ? "Failed to fetch al subir a S3. Configura CORS en el bucket (Permissions → CORS) con tu URL de Vercel. Ver docs/configuracion-aws-s3.md"
+        ? "No se pudo conectar con S3. Comprueba la configuración AWS."
         : "No se pudo conectar para subir la imagen. Comprueba que la API está en marcha.",
     );
   }
