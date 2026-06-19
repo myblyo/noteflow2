@@ -15,6 +15,7 @@ import { useAuthStore } from "../store/authStore";
 import { useThemeColors } from "../hooks/useTheme";
 import { spacing, radius, typography } from "../constants/theme";
 import { updateUserAvatarUrl } from "../lib/firebaseAuth";
+import * as api from "../lib/api";
 import { TAB_ROUTES } from "../utils/routes";
 
 export default function ProfileScreen() {
@@ -29,12 +30,27 @@ export default function ProfileScreen() {
 
   const handleAvatarUploaded = async (publicUrl: string) => {
     if (!user) return;
-    if (Platform.OS !== "web") {
-      await updateUserAvatarUrl(user.id, publicUrl);
+    try {
+      if (Platform.OS === "web") {
+        const updated = await api.updateAvatarUrl(publicUrl);
+        await setSession({
+          id: updated.id,
+          email: updated.email,
+          name: updated.name,
+          avatarUrl: updated.avatarUrl ?? null,
+        });
+      } else {
+        await updateUserAvatarUrl(user.id, publicUrl);
+        await setSession({ ...user, avatarUrl: publicUrl });
+      }
+      setAvatarUrl(publicUrl);
+      Alert.alert("Listo", "Foto de perfil actualizada");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "No se pudo guardar la foto",
+      );
     }
-    setAvatarUrl(publicUrl);
-    await setSession({ ...user, avatarUrl: publicUrl });
-    Alert.alert("Listo", "Foto de perfil actualizada");
   };
 
   return (

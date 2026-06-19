@@ -33,10 +33,15 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hashPassword(password);
-    const [user] = await query<{ id: string; email: string; name: string }>(
+    const [user] = await query<{
+      id: string;
+      email: string;
+      name: string;
+      avatar_url: string | null;
+    }>(
       `INSERT INTO users (email, password_hash, name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, name`,
+       RETURNING id, email, name, avatar_url`,
       [email.toLowerCase(), passwordHash, name],
     );
 
@@ -45,7 +50,12 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         token,
-        user: { id: user.id, email: user.email, name: user.name },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: user.avatar_url,
+        },
       },
       { status: 201 },
     );

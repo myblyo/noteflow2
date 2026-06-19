@@ -48,8 +48,13 @@ function loadWebUser(): UserProfile | null {
   }
 }
 
-function mapApiUser(user: { id: string; email: string; name: string }): UserProfile {
-  return { ...user, avatarUrl: null };
+function mapApiUser(user: {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl?: string | null;
+}): UserProfile {
+  return { ...user, avatarUrl: user.avatarUrl ?? null };
 }
 async function persistSession(user: UserProfile | null) {
   if (!user) {
@@ -80,8 +85,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initWeb: async () => {
     const token = await getToken();
     api.setAuthToken(token);
-    const user = loadWebUser();
-    set({ user: token ? user : null, isReady: true });
+    if (!token) {
+      set({ user: null, isReady: true });
+      return;
+    }
+    try {
+      const user = mapApiUser(await api.getMe());
+      persistWebUser(user);
+      set({ user, isReady: true });
+    } catch {
+      const user = loadWebUser();
+      set({ user, isReady: true });
+    }
   },
 
   initNative: async () => {

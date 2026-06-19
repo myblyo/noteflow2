@@ -7,6 +7,7 @@ export async function GET() {
     endpoints: {
       register: "POST /api/auth/register",
       login: "POST /api/auth/login",
+      me: "GET/PATCH /api/auth/me (requiere Bearer token)",
       notes: "GET/POST /api/notes (requiere Bearer token)",
       noteById: "GET/PATCH/DELETE /api/notes/:id",
       checklistItems: "GET/POST /api/notes/:id/checklist-items",

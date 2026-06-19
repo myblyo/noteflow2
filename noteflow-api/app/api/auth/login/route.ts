@@ -25,9 +25,11 @@ export async function POST(request: Request) {
       email: string;
       name: string;
       password_hash: string;
-    }>("SELECT id, email, name, password_hash FROM users WHERE email = $1", [
-      email.toLowerCase(),
-    ]);
+      avatar_url: string | null;
+    }>(
+      "SELECT id, email, name, password_hash, avatar_url FROM users WHERE email = $1",
+      [email.toLowerCase()],
+    );
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return NextResponse.json(
@@ -40,7 +42,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatarUrl: user.avatar_url,
+      },
     });
   } catch (error) {
     console.error("[auth/login]", error);

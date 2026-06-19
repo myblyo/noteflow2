@@ -11,7 +11,7 @@ export function setAuthToken(token: string | null) {
 
 export type AuthResponse = {
   token: string;
-  user: { id: string; email: string; name: string };
+  user: { id: string; email: string; name: string; avatarUrl?: string | null };
 };
 
 export type ApiChecklistItem = {
@@ -181,6 +181,20 @@ export async function login(
     },
     { auth: false },
   );
+}
+
+export async function getMe(): Promise<AuthResponse["user"]> {
+  const data = await apiFetch<{ user: AuthResponse["user"] }>("/auth/me");
+  return data.user;
+}
+
+export async function updateAvatarUrl(avatarUrl: string): Promise<AuthResponse["user"]> {
+  const data = await apiFetch<{ user: AuthResponse["user"] }>("/auth/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ avatarUrl }),
+  });
+  return data.user;
 }
 
 export async function getNotes(): Promise<ApiNote[]> {
