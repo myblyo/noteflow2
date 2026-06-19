@@ -2,6 +2,7 @@ import type { AnyNote, ChecklistNote, IdeaNote, Note } from "../types";
 import { resolveApiBaseUrl } from "./apiBaseUrl";
 
 const BASE_URL = resolveApiBaseUrl();
+const REQUEST_TIMEOUT_MS = 20_000;
 
 let authToken: string | null = null;
 
@@ -75,13 +76,27 @@ async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
-  } catch {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `La API no responde (${BASE_URL}). Reinicia la API: npm run api`,
+      );
+    }
     throw new Error(
       `No se puede conectar con la API (${BASE_URL}). Arranca la API: npm run api`,
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
   if (!res.ok) {
     let message = `Error ${res.status}`;
@@ -223,12 +238,7 @@ export async function getNoteById(id: string): Promise<ApiNote> {
 }
 
 export async function fetchNotesDetailed(): Promise<ApiNote[]> {
-  const list = await getNotes();
-  return Promise.all(
-    list.map((note) =>
-      note.type === "note" ? Promise.resolve(note) : getNoteById(note.id),
-    ),
-  );
+  return getNotes();
 }
 
 export async function createNote(data: CreateNoteInput): Promise<ApiNote> {
@@ -272,16 +282,27 @@ export async function createChecklistItem(
   });
 }
 
+export type PatchChecklistItemInput = {
+  is_completed?: boolean;
+  task?: string;
+};
+
 export async function patchChecklistItem(
   itemId: string,
-  is_completed?: boolean,
+  updates?: PatchChecklistItemInput,
 ): Promise<ApiChecklistItem> {
+  const body: PatchChecklistItemInput = {};
+  if (updates?.is_completed !== undefined) {
+    body.is_completed = updates.is_completed;
+  }
+  if (updates?.task !== undefined) {
+    body.task = updates.task;
+  }
+
   return apiFetch<ApiChecklistItem>(`/checklist-items/${itemId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      is_completed === undefined ? {} : { is_completed },
-    ),
+    body: JSON.stringify(body),
   });
 }
 

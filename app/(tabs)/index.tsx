@@ -16,7 +16,7 @@ import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
 import { sharedStyles, scrollContentGutter, scrollViewProps, scrollViewWebStyle } from "../../constants/sharedStyles";
-import type { Note, IdeaNote } from "../../types";
+import type { Note, IdeaNote, ChecklistItem } from "../../types";
 import { filterNotes, filterIdeas, filterChecklists } from "../../utils/filterItems";
 import {
   ideaDetailRoute,
@@ -27,6 +27,7 @@ import { navigateForward } from "../../utils/navigation";
 import { IdeaListLeading } from "../../components/IdeaListLeading";
 import { AddButton } from "../../components/AddButton";
 import { ChecklistTitleRow } from "../../components/ChecklistTitleRow";
+import { ChecklistItemRow } from "../../components/ChecklistItemRow";
 import { FavoriteStarButton } from "../../components/FavoriteStarButton";
 import { SelectionCheckbox } from "../../components/SelectionCheckbox";
 import { useItemSelection } from "../../hooks/useItemSelection";
@@ -227,25 +228,8 @@ export default function DashboardScreen() {
     );
   };
 
-  const renderTodoRow = (checklistId: string, item: any) => (
-    <Pressable
-      key={item.id}
-      style={[sharedStyles.listItem, { backgroundColor: colors.surfaceTranslucent }]}
-      onPress={() => store.toggleChecklistItem(checklistId, item.id)}
-    >
-      <View
-        style={[
-          sharedStyles.checkbox,
-          { borderColor: colors.textPrimary },
-          item.isCompleted && { backgroundColor: colors.textPrimary },
-        ]}
-      >
-        {item.isCompleted && <Ionicons name="checkmark" size={16} color={colors.surface} />}
-      </View>
-      <Text style={[sharedStyles.subtitleText, { color: colors.textPrimary, flex: 1, marginLeft: spacing.md }]}>
-        {item.task}
-      </Text>
-    </Pressable>
+  const renderTodoRow = (checklistId: string, item: ChecklistItem) => (
+    <ChecklistItemRow key={item.id} checklistId={checklistId} item={item} />
   );
 
   const renderIdeaRow = (idea: IdeaNote) => {

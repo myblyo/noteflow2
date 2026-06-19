@@ -50,7 +50,7 @@ export function TrashButton({
       <Ionicons
         name="trash-outline"
         size={size}
-        color={isRed ? colors.error : colors.textPrimary}
+        color={isRed ? colors.error : colors.textTertiary}
       />
     </Pressable>
   );

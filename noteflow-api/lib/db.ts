@@ -2,7 +2,6 @@ import "./load-env";
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 let sql: NeonQueryFunction<false, false> | null = null;
-let schemaEnsured: Promise<void> | null = null;
 
 const PLACEHOLDER_HOSTS = new Set(["host", "HOST", "your-host", "YOUR-HOST"]);
 
@@ -23,6 +22,12 @@ function assertValidDatabaseUrl(url: string) {
   }
 }
 
+function normalizeDatabaseUrl(url: string): string {
+  const parsed = new URL(url);
+  parsed.searchParams.delete("channel_binding");
+  return parsed.toString();
+}
+
 function getSql() {
   if (!sql) {
     const url = process.env.DATABASE_URL;
@@ -32,33 +37,9 @@ function getSql() {
       );
     }
     assertValidDatabaseUrl(url);
-    sql = neon(url);
+    sql = neon(normalizeDatabaseUrl(url));
   }
   return sql;
-}
-
-const SCHEMA_PATCHES = [
-  "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''",
-  "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
-  "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT NOT NULL DEFAULT ''",
-  "ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT",
-  "ALTER TABLE notes ADD COLUMN IF NOT EXISTS user_id UUID",
-  "ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT false",
-];
-
-async function ensureDbSchema() {
-  if (!schemaEnsured) {
-    schemaEnsured = (async () => {
-      const client = getSql();
-      for (const statement of SCHEMA_PATCHES) {
-        await client.query(statement);
-      }
-    })().catch((error) => {
-      schemaEnsured = null;
-      throw error;
-    });
-  }
-  await schemaEnsured;
 }
 
 export function formatDbError(error: unknown): string {
@@ -78,7 +59,6 @@ export async function query<T = unknown>(
   text: string,
   params?: unknown[],
 ): Promise<T[]> {
-  await ensureDbSchema();
   const client = getSql();
   const result = params
     ? await client.query(text, params)

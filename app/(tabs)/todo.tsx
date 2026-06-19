@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
 import { View, Text, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useNotesStore } from "../../store/noteStore";
@@ -13,6 +12,7 @@ import { ChecklistNote } from "../../types";
 import { filterChecklists } from "../../utils/filterItems";
 import { AddButton } from "../../components/AddButton";
 import { ChecklistTitleRow } from "../../components/ChecklistTitleRow";
+import { ChecklistItemRow } from "../../components/ChecklistItemRow";
 import { SelectionCheckbox } from "../../components/SelectionCheckbox";
 import { ResponsiveShell } from "../../components/ResponsiveShell";
 import { PageTransition } from "../../components/PageTransition";
@@ -36,37 +36,7 @@ export default function TodoScreen() {
     checklistId: string,
     item: { id: string; task: string; isCompleted: boolean },
   ) => (
-    <Pressable
-      key={item.id}
-      style={[sharedStyles.listItem, { backgroundColor: colors.surfaceTranslucent }]}
-      onPress={() => store.toggleChecklistItem(checklistId, item.id)}
-    >
-      <View
-        style={[
-          sharedStyles.checkbox,
-          { borderColor: colors.textPrimary },
-          item.isCompleted && { backgroundColor: colors.textPrimary },
-        ]}
-      >
-        {item.isCompleted && (
-          <Ionicons name="checkmark" size={16} color={colors.surface} />
-        )}
-      </View>
-      <Text
-        style={[
-          sharedStyles.subtitleText,
-          {
-            color: colors.textPrimary,
-            flex: 1,
-            marginLeft: spacing.md,
-            textDecorationLine: item.isCompleted ? "line-through" : "none",
-            opacity: item.isCompleted ? 0.6 : 1,
-          },
-        ]}
-      >
-        {item.task}
-      </Text>
-    </Pressable>
+    <ChecklistItemRow key={item.id} checklistId={checklistId} item={item} />
   );
 
   const renderChecklist = ({ item }: { item: ChecklistNote }) => {

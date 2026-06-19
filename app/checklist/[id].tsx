@@ -10,8 +10,8 @@ import { goBack } from "../../utils/navigation";
 import { useNotesStore } from "../../store/noteStore";
 import { useThemeColors } from "../../hooks/useTheme";
 import { spacing, radius, typography } from "../../constants/theme";
-import { sharedStyles } from "../../constants/sharedStyles";
 import { ChecklistProgressBar } from "../../components/ChecklistProgressBar";
+import { ChecklistItemRow } from "../../components/ChecklistItemRow";
 import { getChecklistProgress } from "../../utils/checklistProgress";
 import { PageTransition } from "../../components/PageTransition";
 
@@ -105,35 +105,7 @@ export default function ChecklistDetailScreen() {
         keyboardDismissMode="interactive"
       >
         {checklist.items.map((item) => (
-          <Pressable
-            key={item.id}
-            style={[sharedStyles.listItem, { backgroundColor: colors.surfaceTranslucent }]}
-            onPress={() => store.toggleChecklistItem(checklist.id, item.id)}
-          >
-            <View
-              style={[
-                sharedStyles.checkbox,
-                { borderColor: colors.textPrimary },
-                item.isCompleted && { backgroundColor: colors.textPrimary },
-              ]}
-            >
-              {item.isCompleted && (
-                <Ionicons name="checkmark" size={16} color={colors.surface} />
-              )}
-            </View>
-            <Text
-              style={[
-                styles.itemText,
-                {
-                  color: colors.textPrimary,
-                  textDecorationLine: item.isCompleted ? "line-through" : "none",
-                  opacity: item.isCompleted ? 0.6 : 1,
-                },
-              ]}
-            >
-              {item.task}
-            </Text>
-          </Pressable>
+          <ChecklistItemRow key={item.id} checklistId={checklist.id} item={item} />
         ))}
 
         {/* Add new task input */}
@@ -198,11 +170,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xl,
-  },
-  itemText: {
-    ...typography.subtitle,
-    flex: 1,
-    marginLeft: spacing.md,
   },
   addTaskRow: {
     flexDirection: "row",

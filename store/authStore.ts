@@ -95,13 +95,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ user: null, isReady: true });
       return;
     }
+    const cached = loadWebUser();
+    set({ user: cached, isReady: true });
     try {
       const user = mapApiUser(await api.getMe());
       persistWebUser(user);
-      set({ user, isReady: true });
+      set({ user });
     } catch {
-      const user = loadWebUser();
-      set({ user, isReady: true });
+      /* mantener usuario en caché si la API no responde */
     }
   },
 
@@ -139,16 +140,15 @@ export const useAuthStore = create<AuthStore>((set) => ({
         await setToken(token);
         api.setAuthToken(token);
         persistWebUser(profile);
-        set({ user: profile, isLoading: false });
+        set({ user: profile, isReady: true });
         return;
       }
 
       const user = await loginWithEmail(email, password);
       await persistSession(user);
-      set({ user, isLoading: false });
+      set({ user, isReady: true });
     } catch (error) {
       set({
-        isLoading: false,
         error:
           Platform.OS === "web"
             ? error instanceof Error
@@ -157,6 +157,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
             : firebaseAuthErrorMessage(error),
       });
       throw error;
+    } finally {
+      set({ isLoading: false });
     }
   },
 
@@ -169,16 +171,15 @@ export const useAuthStore = create<AuthStore>((set) => ({
         await setToken(token);
         api.setAuthToken(token);
         persistWebUser(profile);
-        set({ user: profile, isLoading: false });
+        set({ user: profile, isReady: true });
         return;
       }
 
       const user = await registerWithProfile(email, password, name);
       await persistSession(user);
-      set({ user, isLoading: false });
+      set({ user, isReady: true });
     } catch (error) {
       set({
-        isLoading: false,
         error:
           Platform.OS === "web"
             ? error instanceof Error
@@ -187,6 +188,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
             : firebaseAuthErrorMessage(error),
       });
       throw error;
+    } finally {
+      set({ isLoading: false });
     }
   },
 

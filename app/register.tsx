@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "../store/authStore";
-import { useNotesStore } from "../store/noteStore";
 import { useThemeColors } from "../hooks/useTheme";
 import { spacing, radius, typography } from "../constants/theme";
 import { PageTransition } from "../components/PageTransition";
@@ -19,7 +18,6 @@ export default function RegisterScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const auth = useAuthStore();
-  const fetchNotes = useNotesStore((s) => s.fetchNotes);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -31,7 +29,6 @@ export default function RegisterScreen() {
     }
     try {
       await auth.register(name.trim(), email.trim(), password);
-      await fetchNotes();
       router.replace("/(tabs)");
     } catch {
       /* error en authStore */

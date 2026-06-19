@@ -54,6 +54,12 @@ interface NotesStore {
   toggleIdeaFavorite: (id: string) => Promise<void>;
   toggleChecklistItem: (checklistId: string, itemId: string) => Promise<void>;
   addChecklistItem: (checklistId: string, task: string) => Promise<void>;
+  updateChecklistItemTask: (
+    checklistId: string,
+    itemId: string,
+    task: string,
+  ) => Promise<void>;
+  removeChecklistItem: (checklistId: string, itemId: string) => Promise<void>;
 
   updateNote: (
     id: string,
@@ -279,6 +285,56 @@ export const useNotesStore = create<NotesStore>()((set, get) => ({
           : c,
       ),
     }));
+  },
+
+  updateChecklistItemTask: async (checklistId, itemId, task) => {
+    const trimmed = task.trim();
+    if (!trimmed) return;
+
+    set({ error: null });
+    try {
+      const item = await api.patchChecklistItem(itemId, { task: trimmed });
+      const mapped = mapChecklistItem(item);
+      set((state) => ({
+        checklists: state.checklists.map((c) =>
+          c.id === checklistId
+            ? {
+                ...c,
+                updatedAt: new Date(),
+                items: c.items.map((i) => (i.id === itemId ? mapped : i)),
+              }
+            : c,
+        ),
+      }));
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : "Error al editar la tarea",
+      });
+    }
+  },
+
+  removeChecklistItem: async (checklistId, itemId) => {
+    set({ error: null });
+    try {
+      await api.deleteChecklistItem(itemId);
+      set((state) => ({
+        checklists: state.checklists.map((c) =>
+          c.id === checklistId
+            ? {
+                ...c,
+                updatedAt: new Date(),
+                items: c.items.filter((i) => i.id !== itemId),
+              }
+            : c,
+        ),
+      }));
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : "Error al borrar la tarea",
+      });
+    }
   },
 
   updateNote: async (id, updates) => {

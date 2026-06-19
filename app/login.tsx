@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "../store/authStore";
-import { useNotesStore } from "../store/noteStore";
 import { useThemeColors } from "../hooks/useTheme";
 import { spacing, radius, typography } from "../constants/theme";
 import { PageTransition } from "../components/PageTransition";
@@ -19,7 +18,6 @@ export default function LoginScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const auth = useAuthStore();
-  const fetchNotes = useNotesStore((s) => s.fetchNotes);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +25,6 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       await auth.login(email.trim(), password);
-      await fetchNotes();
       router.replace("/(tabs)");
     } catch {
       /* error en authStore */
@@ -48,7 +45,7 @@ export default function LoginScreen() {
             Inicia sesión para ver tus notas
           </Text>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
-            Usa tu cuenta de Firebase. ¿Primera vez? Pulsa «Crear cuenta».
+            ¿Primera vez? Pulsa «Crear cuenta».
           </Text>
 
           <TextInput

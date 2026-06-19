@@ -25,6 +25,85 @@ export type NoteWithRelations = NoteRow & {
   items: Array<{ id: string; task: string; is_completed: boolean }>;
 };
 
+export type NoteListItem = NoteWithRelations & {
+  attachment_preview?: string | null;
+  attachment_count?: number;
+};
+
+const NOTES_WITH_ATTACHMENTS_SQL = `
+  SELECT n.*,
+    (
+      SELECT na.url
+      FROM note_attachments na
+      WHERE na.note_id = n.id
+      ORDER BY na.created_at ASC
+      LIMIT 1
+    ) AS attachment_preview,
+    (
+      SELECT COUNT(*)::int
+      FROM note_attachments na
+      WHERE na.note_id = n.id
+    ) AS attachment_count
+  FROM notes n
+  WHERE n.user_id = $1
+  ORDER BY n.created_at DESC
+`;
+
+const NOTES_BASIC_SQL = `
+  SELECT n.*,
+    NULL::text AS attachment_preview,
+    0::int AS attachment_count
+  FROM notes n
+  WHERE n.user_id = $1
+  ORDER BY n.created_at DESC
+`;
+
+export async function listNotesForUser(userId: string): Promise<NoteListItem[]> {
+  let rows: Array<
+    NoteRow & { attachment_preview?: string | null; attachment_count?: number }
+  >;
+  try {
+    rows = await query(NOTES_WITH_ATTACHMENTS_SQL, [userId]);
+  } catch {
+    rows = await query(NOTES_BASIC_SQL, [userId]);
+  }
+
+  if (!rows.length) return [];
+
+  const noteIds = rows.map((note) => note.id);
+  const tags = await query<{ note_id: string; tag: string }>(
+    "SELECT note_id, tag FROM note_tags WHERE note_id = ANY($1::uuid[]) ORDER BY tag",
+    [noteIds],
+  );
+  const items = await query<ItemRow & { note_id: string }>(
+    "SELECT note_id, id, task, is_completed, position FROM checklist_items WHERE note_id = ANY($1::uuid[]) ORDER BY position",
+    [noteIds],
+  );
+
+  const tagsByNote = new Map<string, string[]>();
+  for (const { note_id, tag } of tags) {
+    const list = tagsByNote.get(note_id) ?? [];
+    list.push(tag);
+    tagsByNote.set(note_id, list);
+  }
+
+  const itemsByNote = new Map<
+    string,
+    Array<{ id: string; task: string; is_completed: boolean }>
+  >();
+  for (const { note_id, id, task, is_completed } of items) {
+    const list = itemsByNote.get(note_id) ?? [];
+    list.push({ id, task, is_completed });
+    itemsByNote.set(note_id, list);
+  }
+
+  return rows.map((note) => ({
+    ...note,
+    tags: tagsByNote.get(note.id) ?? [],
+    items: itemsByNote.get(note.id) ?? [],
+  }));
+}
+
 export async function getNoteWithRelations(
   id: string,
   userId: string,

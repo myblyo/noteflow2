@@ -71,6 +71,38 @@ export async function toggleChecklistItem(
   return item ?? null;
 }
 
+export async function updateChecklistItem(
+  itemId: string,
+  updates: { task?: string; is_completed?: boolean },
+): Promise<ChecklistItem | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [itemId];
+  let index = 2;
+
+  if (updates.task !== undefined) {
+    sets.push(`task = $${index}`);
+    values.push(updates.task);
+    index += 1;
+  }
+  if (updates.is_completed !== undefined) {
+    sets.push(`is_completed = $${index}`);
+    values.push(updates.is_completed);
+    index += 1;
+  }
+
+  if (!sets.length) {
+    return getChecklistItem(itemId);
+  }
+
+  const [item] = await query<ChecklistItem>(
+    `UPDATE checklist_items SET ${sets.join(", ")}
+     WHERE id = $1
+     RETURNING id, note_id, task, is_completed, position`,
+    values,
+  );
+  return item ?? null;
+}
+
 export async function deleteChecklistItem(itemId: string): Promise<boolean> {
   const deleted = await query<{ id: string }>(
     "DELETE FROM checklist_items WHERE id = $1 RETURNING id",
