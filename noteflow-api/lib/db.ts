@@ -21,13 +21,21 @@ function getSql() {
   return sql;
 }
 
+const SCHEMA_PATCHES = [
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''",
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
+  "ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT",
+  "ALTER TABLE notes ADD COLUMN IF NOT EXISTS user_id UUID",
+  "ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT false",
+];
+
 async function ensureDbSchema() {
   if (!schemaEnsured) {
     schemaEnsured = (async () => {
       const client = getSql();
-      await client.query(
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
-      );
+      for (const statement of SCHEMA_PATCHES) {
+        await client.query(statement);
+      }
     })().catch((error) => {
       schemaEnsured = null;
       throw error;

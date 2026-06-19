@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 loadEnvConfig(path.join(__dirname, ".."));
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["firebase-admin"],
   turbopack: {
     root: __dirname,
   },
