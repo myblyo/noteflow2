@@ -94,6 +94,10 @@ async function apiFetch<T>(
     } catch {
       /* respuesta no JSON */
     }
+    if (res.status === 405) {
+      message =
+        "Error 405: la app no está llamando a la API correcta. En Vercel (proyecto web), configura EXPO_PUBLIC_API_URL con la URL del proyecto noteflow-api, terminando en /api, y vuelve a desplegar.";
+    }
     throw new Error(message);
   }
   if (res.status === 204) {
