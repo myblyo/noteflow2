@@ -12,6 +12,7 @@
     "@aws-sdk/client-s3": "^3.1065.0",
     "@aws-sdk/s3-request-presigner": "^3.1065.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^0.27.3",
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.4.7",
     "firebase-admin": "^14.0.0",
