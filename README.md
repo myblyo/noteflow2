@@ -171,20 +171,28 @@ Necesitas **dos proyectos en Vercel** (o uno para la API y otro para la web):
 3. Variables: `DATABASE_URL`, `JWT_SECRET` (+ S3/Firebase si aplica).
 4. Deploy.
 
-### 2. App web (Expo)
+### 2. App web (frontend Expo)
 
-1. Crea **otro** proyecto en Vercel con el mismo repo.
-2. **Root Directory:** deja la raíz del repo (`.`), no `noteflow-api`.
-3. En **Settings → General → Build & Development**, si no puedes editar los campos, sube el archivo de config:
-   - Renombra `vercel.web.json` → `vercel.json` en la raíz (solo en el proyecto web), **o** pega estos valores si Vercel te deja override:
-   - **Build Command:** `npm run build:web`
-   - **Output Directory:** `dist`
-   - **Framework:** Other
-4. Variable de entorno:
-   - `EXPO_PUBLIC_API_URL` = `https://TU-API.vercel.app/api`
-5. Deploy.
+1. Crea **otro** proyecto en Vercel con el **mismo repo** (no reutilices el de la API).
+2. Configuración:
 
-> No despliegues la raíz sin `build:web`: Vercel podría mostrar código suelto (`index.ts`) en lugar de la app.
+| Campo | Valor |
+|--------|--------|
+| **Root Directory** | *(vacío — raíz del repo)* |
+| **Framework Preset** | Other |
+| **Build Command** | `npm run build:web` |
+| **Output Directory** | `dist` |
+| **Install Command** | `npm install` |
+
+   Si no puedes editar los campos, Vercel leerá `vercel.json` de la raíz del repo (ya incluido).
+
+3. **Environment Variables:**
+   - `EXPO_PUBLIC_API_URL` = `https://TU-API.vercel.app/api`  
+     (la URL real de tu proyecto API, con `/api` al final)
+
+4. **Deploy** → abre la URL que te da Vercel → deberías ver login / Noteflow.
+
+> El proyecto API usa Root Directory `noteflow-api` y **no** usa `dist`. El frontend usa la raíz y **sí** usa `dist`.
 
 - **App móvil (iOS/Android):** builds con [EAS Build](https://docs.expo.dev/build/introduction/) (`eas.json` incluido). En producción usa la misma `EXPO_PUBLIC_API_URL`.
 
