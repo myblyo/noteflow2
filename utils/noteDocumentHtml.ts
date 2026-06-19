@@ -44,6 +44,12 @@ export function injectEditorStyles() {
       display: block;
       pointer-events: none;
       box-sizing: border-box;
+      object-fit: contain;
+    }
+    .nf-doc-editor .nf-image img.nf-img-error {
+      min-height: 48px;
+      min-width: 80px;
+      background: #f3f4f6;
     }
     .nf-doc-editor .nf-image.nf-wrap-square.nf-align-left,
     .nf-doc-editor .nf-image.nf-wrap-free.nf-align-left,
@@ -152,16 +158,29 @@ export function createImageWidget(block: ImageBlock): HTMLSpanElement {
   const span = document.createElement("span");
   span.className = `${IMAGE_CLASS} ${wrapClass(block.wrap)} ${alignClass(block.align)}`;
   span.contentEditable = "false";
+  span.draggable = true;
   span.style.position = "relative";
   applyImageDataset(span, block);
 
   const img = document.createElement("img");
   img.src = block.url;
-  img.alt = block.fileName ?? "Imagen";
+  img.alt = "";
   img.draggable = false;
   img.style.width = `${block.width}px`;
   img.style.maxWidth = "100%";
+  img.onerror = () => {
+    img.classList.add("nf-img-error");
+    img.removeAttribute("alt");
+  };
   span.appendChild(img);
+
+  span.ondragstart = (event) => {
+    event.stopPropagation();
+    event.dataTransfer?.setData("application/x-noteflow-block", block.id);
+    event.dataTransfer?.setData("text/plain", "");
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  };
+
   return span;
 }
 
@@ -198,7 +217,14 @@ export function applyImageDataset(span: HTMLSpanElement, block: ImageBlock) {
   span.classList.remove("nf-dragging");
 
   const img = span.querySelector("img");
-  if (img) img.style.width = `${block.width}px`;
+  if (img) {
+    img.style.width = `${block.width}px`;
+    img.alt = "";
+    img.classList.remove("nf-img-error");
+    if (block.url && img.src !== block.url) {
+      img.src = block.url;
+    }
+  }
 }
 
 export function imageBlockFromSpan(span: HTMLSpanElement): ImageBlock {
@@ -226,6 +252,15 @@ export function parseEditorToDocument(root: HTMLElement): NoteDocument {
 
   const flushText = () => {
     if (!textAcc) return;
+    const trimmed = textAcc.trim();
+    if (
+      trimmed &&
+      !trimmed.includes("\n") &&
+      /^[\w.\-()]+\.(jpe?g|png|gif|webp|bmp|heic|avif)$/i.test(trimmed)
+    ) {
+      textAcc = "";
+      return;
+    }
     blocks.push({ type: "text", id: newBlockId(), text: textAcc });
     textAcc = "";
   };
@@ -243,6 +278,10 @@ export function parseEditorToDocument(root: HTMLElement): NoteDocument {
     if (el.classList.contains(IMAGE_CLASS)) {
       flushText();
       blocks.push(imageBlockFromSpan(el as HTMLSpanElement));
+      return;
+    }
+
+    if (el.tagName === "IMG") {
       return;
     }
 

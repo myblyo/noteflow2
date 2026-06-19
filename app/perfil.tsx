@@ -39,12 +39,39 @@ export default function ProfileScreen() {
   const savedAvatarUrl = user?.avatarUrl ?? null;
   const displayAvatarUrl = pendingAvatarUrl ?? savedAvatarUrl;
   const avatarChanged =
-    pendingAvatarUrl !== null && pendingAvatarUrl !== savedAvatarUrl;
+    pendingAvatarUrl !== null &&
+    pendingAvatarUrl !== savedAvatarUrl &&
+    !pendingAvatarUrl.startsWith("blob:");
   const bioChanged = bio.trim() !== (user?.bio ?? "");
   const hasChanges = avatarChanged || bioChanged;
 
-  const handleAvatarUploaded = (publicUrl: string) => {
+  const handleAvatarUploaded = async (publicUrl: string) => {
     setPendingAvatarUrl(publicUrl);
+    if (!user || Platform.OS !== "web") return;
+
+    setSaving(true);
+    try {
+      const updated = await api.updateProfile({ avatarUrl: publicUrl });
+      await setSession({
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        bio: updated.bio ?? bio.trim(),
+        avatarUrl: updated.avatarUrl ?? publicUrl,
+      });
+      setPendingAvatarUrl(null);
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "No se pudo guardar la foto",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarPreview = (localUri: string) => {
+    setPendingAvatarUrl(localUri);
   };
 
   const handleSave = async () => {
@@ -169,6 +196,7 @@ export default function ProfileScreen() {
           <ImageAttachButton
             label="Cambiar foto de perfil"
             folder="avatars"
+            onPreview={handleAvatarPreview}
             onUploaded={handleAvatarUploaded}
             variant="secondary"
           />

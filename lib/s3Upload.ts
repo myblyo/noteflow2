@@ -88,11 +88,21 @@ export async function uploadToS3(
     Object.assign(uploadHeaders, await getAuthHeader());
   }
 
-  const uploadResponse = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: uploadHeaders,
-    body: blob,
-  });
+  let uploadResponse: Response;
+  try {
+    uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: uploadHeaders,
+      body: blob,
+    });
+  } catch {
+    const isS3 = uploadUrl.includes("amazonaws.com");
+    throw new Error(
+      isS3
+        ? "Failed to fetch al subir a S3. Configura CORS en el bucket (Permissions → CORS) con tu URL de Vercel. Ver docs/configuracion-aws-s3.md"
+        : "No se pudo conectar para subir la imagen. Comprueba que la API está en marcha.",
+    );
+  }
 
   if (!uploadResponse.ok) {
     const detail = await uploadResponse.text().catch(() => "");

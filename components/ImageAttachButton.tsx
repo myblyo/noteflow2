@@ -16,6 +16,7 @@ type ImageAttachButtonProps = {
   label: string;
   folder: UploadFolder;
   onUploaded: (publicUrl: string) => void | Promise<void>;
+  onPreview?: (localUri: string) => void;
   variant?: "primary" | "secondary";
 };
 
@@ -23,6 +24,7 @@ export function ImageAttachButton({
   label,
   folder,
   onUploaded,
+  onPreview,
   variant = "secondary",
 }: ImageAttachButtonProps) {
   const colors = useThemeColors();
@@ -39,6 +41,8 @@ export function ImageAttachButton({
           ? await pickImageFromLibrary()
           : await takePhotoWithCamera();
       if (!picked) return;
+
+      onPreview?.(picked.uri);
 
       const publicUrl = await uploadToS3(picked.uri, {
         folder,

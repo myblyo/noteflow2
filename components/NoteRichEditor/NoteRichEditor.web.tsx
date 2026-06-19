@@ -191,7 +191,9 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
             const uploading = { ...block, status: "uploading" as const };
             applyImageDataset(widget, uploading);
             const uploaded = await uploadAndPatchImage(block, file);
-            URL.revokeObjectURL(block.url);
+            const imgEl = widget.querySelector("img");
+            if (imgEl && uploaded.url) imgEl.src = uploaded.url;
+            if (block.url.startsWith("blob:")) URL.revokeObjectURL(block.url);
             blobsRef.current.delete(block.id);
             applyImageDataset(widget, uploaded);
           }
@@ -583,6 +585,7 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
           onMouseDown: handleEditorMouseDown,
           onDragOver: (e: DragEvent) => {
             e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
           },
           onDrop: (e: DragEvent) => {
             e.preventDefault();
@@ -595,12 +598,10 @@ export const NoteRichEditor = forwardRef<NoteRichEditorRef, NoteRichEditorProps>
             if (!blockId || !editorRef.current) return;
             const span = findImageSpan(editorRef.current, blockId);
             if (!span) return;
-            const range = caretRangeFromPoint(e.clientX, e.clientY);
-            if (range) {
-              range.insertNode(span);
-              placeCaretAfter(span);
-              emitFromEditor();
-            }
+            e.stopPropagation();
+            relocateImageAtPoint(editorRef.current, span, e.clientX, e.clientY);
+            placeCaretAfter(span);
+            emitFromEditor();
           },
           style: {
             width: "100%",

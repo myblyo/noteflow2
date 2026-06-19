@@ -52,6 +52,34 @@ Así las imágenes se ven con URLs como:
 
 ---
 
+## Paso 2b — CORS del bucket (obligatorio para web / Vercel)
+
+Desde el **navegador**, la app hace `PUT` directo a S3. Sin CORS el navegador bloquea la petición con **"Failed to fetch"**.
+
+1. Bucket → **Permissions** → **Cross-origin resource sharing (CORS)**
+2. **Edit** → pega esto (sustituye tu dominio de Vercel):
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedOrigins": [
+      "https://TU-FRONT.vercel.app",
+      "http://localhost:8081",
+      "http://localhost:19006"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+> Sustituye `https://TU-FRONT.vercel.app` por la URL exacta de tu frontend (copia la de la barra del navegador).  
+> Para probar rápido puedes usar `"*"` en `AllowedOrigins` (menos restrictivo).
+
+---
+
 ## Paso 3 — Usuario IAM para la API
 
 1. [IAM → Users → Create user](https://console.aws.amazon.com/iam/) → `noteflow-api`
@@ -132,8 +160,9 @@ Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local auto
 
 | Síntoma | Solución |
 |---------|----------|
+| **Failed to fetch** al subir (web/Vercel) | Configura **CORS** en el bucket S3 (Paso 2b) |
 | Error interno en presign | Faltan variables AWS en el proyecto **API** |
-| PUT a S3 → 403 | IAM sin permiso `s3:PutObject` |
+| PUT a S3 → 403 | IAM sin permiso `s3:PutObject` o región incorrecta (`AWS_REGION`) |
 | Imagen no se ve | Bucket sin lectura pública o `AWS_S3_PUBLIC_URL` incorrecta |
 | Funciona local, no en Vercel | Variables solo en `.env.local`, no en Vercel |
 
