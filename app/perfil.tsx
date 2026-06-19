@@ -22,51 +22,60 @@ import { updateUserProfile } from "../lib/firebaseAuth";
 import * as api from "../lib/api";
 import { TAB_ROUTES } from "../utils/routes";
 
+function mergeProfile(
+  user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>,
+  updated: api.AuthResponse["user"],
+  fallbackBio: string,
+): NonNullable<ReturnType<typeof useAuthStore.getState>["user"]> {
+  return {
+    id: updated.id,
+    email: updated.email,
+    name: updated.name,
+    bio: updated.bio ?? fallbackBio,
+    avatarUrl: updated.avatarUrl ?? user.avatarUrl,
+  };
+}
+
 export default function ProfileScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const setSession = useAuthStore((s) => s.setSession);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
   const logout = useAuthStore((s) => s.logout);
-  const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
+  const [previewAvatarUrl, setPreviewAvatarUrl] = useState<string | null>(null);
   const [bio, setBio] = useState(user?.bio ?? "");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      void refreshUser();
+    }
+  }, [refreshUser]);
 
   useEffect(() => {
     setBio(user?.bio ?? "");
   }, [user?.bio]);
 
   const savedAvatarUrl = user?.avatarUrl ?? null;
-  const pendingHttpAvatar =
-    pendingAvatarUrl && !pendingAvatarUrl.startsWith("blob:")
-      ? pendingAvatarUrl
-      : null;
-  const displayAvatarUrl = pendingAvatarUrl ?? savedAvatarUrl;
-  const avatarChanged =
-    pendingHttpAvatar !== null && pendingHttpAvatar !== savedAvatarUrl;
+  const displayAvatarUrl = previewAvatarUrl ?? savedAvatarUrl;
   const bioChanged = bio.trim() !== (user?.bio ?? "");
-  const hasChanges = avatarChanged || bioChanged;
+  const hasChanges = bioChanged;
 
   const handleAvatarUploaded = async (publicUrl: string) => {
     if (!user) return;
 
-    setPendingAvatarUrl(publicUrl);
+    setPreviewAvatarUrl(publicUrl);
     setSaving(true);
     try {
       if (Platform.OS === "web") {
         const updated = await api.updateProfile({ avatarUrl: publicUrl });
-        await setSession({
-          id: updated.id,
-          email: updated.email,
-          name: updated.name,
-          bio: updated.bio ?? bio.trim(),
-          avatarUrl: updated.avatarUrl ?? publicUrl,
-        });
+        await setSession(mergeProfile(user, updated, bio.trim()));
       } else {
         await updateUserProfile(user.id, { avatarUrl: publicUrl });
         await setSession({ ...user, avatarUrl: publicUrl });
       }
-      setPendingAvatarUrl(null);
+      setPreviewAvatarUrl(null);
     } catch (error) {
       Alert.alert(
         "Error",
@@ -78,39 +87,19 @@ export default function ProfileScreen() {
   };
 
   const handleAvatarPreview = (localUri: string) => {
-    setPendingAvatarUrl(localUri);
+    setPreviewAvatarUrl(localUri);
   };
 
   const handleSave = async () => {
     if (!user || !hasChanges) return;
     setSaving(true);
     try {
-      const patch: { avatarUrl?: string; bio?: string } = {};
-      if (avatarChanged && pendingHttpAvatar) {
-        patch.avatarUrl = pendingHttpAvatar;
-      }
-      if (bioChanged) patch.bio = bio.trim();
-
       if (Platform.OS === "web") {
-        const updated = await api.updateProfile(patch);
-        await setSession({
-          id: updated.id,
-          email: updated.email,
-          name: updated.name,
-          bio: updated.bio ?? bio.trim(),
-          avatarUrl: updated.avatarUrl ?? patch.avatarUrl ?? savedAvatarUrl,
-        });
+        const updated = await api.updateProfile({ bio: bio.trim() });
+        await setSession(mergeProfile(user, updated, bio.trim()));
       } else {
-        await updateUserProfile(user.id, patch);
-        await setSession({
-          ...user,
-          bio: patch.bio ?? user.bio,
-          avatarUrl: patch.avatarUrl ?? user.avatarUrl,
-        });
-      }
-
-      if (patch.avatarUrl || !pendingAvatarUrl?.startsWith("blob:")) {
-        setPendingAvatarUrl(null);
+        await updateUserProfile(user.id, { bio: bio.trim() });
+        await setSession({ ...user, bio: bio.trim() });
       }
       Alert.alert("Listo", "Cambios guardados");
     } catch (error) {

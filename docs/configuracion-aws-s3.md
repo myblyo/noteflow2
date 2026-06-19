@@ -133,14 +133,15 @@ AWS_S3_PUBLIC_URL=https://noteflow2-images.s3.eu-west-1.amazonaws.com
 
 1. Arranca la API: `npm run api`
 2. Inicia sesión en la app.
-3. **Perfil → Cambiar foto de perfil → Guardar cambios**
+3. **Perfil → Cambiar foto de perfil** (se guarda automáticamente al subir)
 4. En DevTools → **Network**:
-   - `POST .../api/uploads/presign` → 200
-   - `PUT https://noteflow2-images.s3...` → 200
+   - Web/Vercel: `POST .../api/uploads/direct` → 200
+   - Móvil: `POST .../api/uploads/presign` → 200 y `PUT` a S3 → 200
+   - Mostrar imagen: `GET .../api/media/avatars/...` → 200
 
 ### Sin AWS (solo desarrollo)
 
-Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local automáticamente (`/api/uploads/local`). Las imágenes se guardan en `noteflow-api/public/uploads/`.
+Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local automáticamente (`/api/uploads/local`). Las imágenes se guardan en `noteflow-api/public/uploads/` y se sirven vía `/api/media/...`.
 
 ---
 
@@ -149,10 +150,12 @@ Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local auto
 | Archivo | Función |
 |---------|---------|
 | `noteflow-api/lib/s3.ts` | Cliente S3 + Presigned URL |
-| `noteflow-api/app/api/uploads/presign/route.ts` | Endpoint presign |
-| `lib/s3Upload.ts` | App: pide URL y sube con PUT |
+| `noteflow-api/app/api/uploads/direct/route.ts` | Subida server-side (web/Vercel) |
+| `noteflow-api/app/api/media/[...path]/route.ts` | Proxy de imágenes S3 (bucket privado) |
+| `lib/s3Upload.ts` | App: subida directa (web) o presign + PUT (móvil) |
+| `lib/mediaUrl.ts` | Convierte URLs S3 → `/api/media/...` para mostrar |
 | `lib/uploadToAWS.ts` | Avatar + Firestore (móvil) |
-| `components/RemoteImage.tsx` | Muestra imágenes con caché |
+| `components/RemoteImage.tsx` | Muestra imágenes vía proxy de la API |
 
 ---
 
@@ -163,7 +166,8 @@ Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local auto
 | **Failed to fetch** al subir (web/Vercel) | Configura **CORS** en el bucket S3 (Paso 2b) |
 | Error interno en presign | Faltan variables AWS en el proyecto **API** |
 | PUT a S3 → 403 | IAM sin permiso `s3:PutObject` o región incorrecta (`AWS_REGION`) |
-| Imagen no se ve | Bucket sin lectura pública o `AWS_S3_PUBLIC_URL` incorrecta |
+| Imagen no se ve | No hace falta bucket público: la app usa `/api/media/...`. Comprueba credenciales AWS en el proyecto API |
+| Foto de perfil desaparece al guardar | La foto se guarda al subir; "Guardar cambios" es solo para la bio |
 | Funciona local, no en Vercel | Variables solo en `.env.local`, no en Vercel |
 
 ---

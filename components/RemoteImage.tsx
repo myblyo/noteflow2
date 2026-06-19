@@ -10,6 +10,7 @@ import {
 import { Image, type ImageContentFit } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColors } from "../hooks/useTheme";
+import { resolveMediaUrl } from "../lib/mediaUrl";
 
 type RemoteImageProps = {
   uri: string | null | undefined;
@@ -41,6 +42,7 @@ export function RemoteImage({
   const colors = useThemeColors();
   const [loading, setLoading] = useState(Boolean(uri));
   const [failed, setFailed] = useState(false);
+  const displayUri = resolveMediaUrl(uri) ?? uri;
 
   if (!uri) {
     return (
@@ -58,8 +60,8 @@ export function RemoteImage({
     return (
       <View style={[styles.wrap, style]}>
         {createElement("img", {
-          key: recyclingKey ?? uri,
-          src: uri,
+          key: recyclingKey ?? displayUri,
+          src: displayUri,
           alt: "",
           onLoad: () => {
             setFailed(false);
@@ -94,12 +96,12 @@ export function RemoteImage({
   return (
     <View style={[styles.wrap, style]}>
       <Image
-        source={{ uri }}
+        source={{ uri: displayUri }}
         style={StyleSheet.absoluteFill}
         contentFit={contentFit}
         cachePolicy="memory-disk"
         transition={200}
-        recyclingKey={recyclingKey ?? uri}
+        recyclingKey={recyclingKey ?? displayUri}
         onLoadStart={() => {
           setFailed(false);
           setLoading(true);

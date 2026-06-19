@@ -20,6 +20,7 @@ interface AuthStore {
   error: string | null;
   initWeb: () => Promise<void>;
   initNative: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   setSession: (user: UserProfile | null) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
@@ -108,6 +109,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const token = await getToken();
     if (token) {
       api.setAuthToken(token);
+    }
+  },
+
+  refreshUser: async () => {
+    const token = await getToken();
+    if (!token) return;
+    api.setAuthToken(token);
+    try {
+      const user = mapApiUser(await api.getMe());
+      persistWebUser(user);
+      set({ user });
+    } catch {
+      /* mantener usuario en caché si la API no responde */
     }
   },
 

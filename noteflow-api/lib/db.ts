@@ -8,14 +8,34 @@ config({ path: path.resolve(process.cwd(), "../.env.local") });
 let sql: NeonQueryFunction<false, false> | null = null;
 let schemaEnsured: Promise<void> | null = null;
 
+const PLACEHOLDER_HOSTS = new Set(["host", "HOST", "your-host", "YOUR-HOST"]);
+
+function parseDatabaseHost(url: string): string | null {
+  const match = url.match(/@([^/:?]+)/);
+  return match?.[1] ?? null;
+}
+
+function assertValidDatabaseUrl(url: string) {
+  const host = parseDatabaseHost(url);
+  if (!host || PLACEHOLDER_HOSTS.has(host)) {
+    throw new Error(
+      "DATABASE_URL no es válida: sigue con el placeholder @HOST de la documentación. " +
+        "Copia la connection string real desde Neon (console.neon.tech → tu proyecto → Connect) " +
+        "y pégala en .env.local (raíz del repo o noteflow-api/.env.local). " +
+        "En Vercel, actualiza la variable en el proyecto noteflow-api.",
+    );
+  }
+}
+
 function getSql() {
   if (!sql) {
     const url = process.env.DATABASE_URL;
     if (!url) {
       throw new Error(
-        "DATABASE_URL is not set. Add it in Vercel → Settings → Environment Variables.",
+        "DATABASE_URL is not set. Add it in .env.local or Vercel → Settings → Environment Variables.",
       );
     }
+    assertValidDatabaseUrl(url);
     sql = neon(url);
   }
   return sql;

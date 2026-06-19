@@ -5,6 +5,7 @@ import type {
   NoteBlock,
   NoteDocument,
 } from "../types/noteDocument";
+import { resolveMediaUrl } from "../lib/mediaUrl";
 import { emptyDocument, newBlockId } from "./noteDocument";
 
 const IMAGE_CLASS = "nf-image";
@@ -163,7 +164,7 @@ export function createImageWidget(block: ImageBlock): HTMLSpanElement {
   applyImageDataset(span, block);
 
   const img = document.createElement("img");
-  img.src = block.url;
+  img.src = resolveMediaUrl(block.url) ?? block.url;
   img.alt = "";
   img.draggable = false;
   img.style.width = `${block.width}px`;
@@ -221,8 +222,9 @@ export function applyImageDataset(span: HTMLSpanElement, block: ImageBlock) {
     img.style.width = `${block.width}px`;
     img.alt = "";
     img.classList.remove("nf-img-error");
-    if (block.url && img.src !== block.url) {
-      img.src = block.url;
+    const displayUrl = resolveMediaUrl(block.url) ?? block.url;
+    if (block.url && img.src !== displayUrl) {
+      img.src = displayUrl;
     }
   }
 }

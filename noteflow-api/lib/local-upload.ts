@@ -34,3 +34,21 @@ export async function saveLocalUpload(key: string, body: Buffer): Promise<void> 
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, body);
 }
+
+export async function readLocalUpload(key: string): Promise<Buffer> {
+  if (!isValidUploadKey(key)) {
+    throw new Error("Clave de subida inválida");
+  }
+
+  const filePath = path.join(UPLOADS_DIR, ...key.split("/"));
+  return fs.readFile(filePath);
+}
+
+export function guessImageContentType(key: string): string {
+  const lower = key.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  return "image/jpeg";
+}

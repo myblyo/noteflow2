@@ -107,3 +107,32 @@ export async function createPresignedUploadUrl(input: {
     key,
   };
 }
+
+export async function getObjectFromS3(key: string): Promise<{
+  body: Buffer;
+  contentType: string | undefined;
+}> {
+  if (!bucket) {
+    throw new Error("AWS_S3_BUCKET no configurado");
+  }
+
+  const client = await getS3Client();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    }),
+  );
+
+  const bytes = await response.Body?.transformToByteArray();
+  if (!bytes) {
+    throw new Error("Objeto S3 vacío");
+  }
+
+  return {
+    body: Buffer.from(bytes),
+    contentType: response.ContentType,
+  };
+}
