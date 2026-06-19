@@ -9,6 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/authStore";
 import { useThemeColors } from "../hooks/useTheme";
 import { spacing, radius, typography } from "../constants/theme";
@@ -21,6 +22,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     try {
@@ -64,21 +66,39 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
           />
-          <TextInput
+          <View
             style={[
-              styles.input,
+              styles.passwordRow,
               {
-                color: colors.textPrimary,
                 borderColor: colors.border,
                 backgroundColor: colors.surface,
               },
             ]}
-            placeholder="Contraseña"
-            placeholderTextColor={colors.textSecondary}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          >
+            <TextInput
+              style={[styles.passwordInput, { color: colors.textPrimary }]}
+              placeholder="Contraseña"
+              placeholderTextColor={colors.textSecondary}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Pressable
+              onPressIn={() => setShowPassword(true)}
+              onPressOut={() => setShowPassword(false)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Mostrar contraseña"
+            >
+              <Ionicons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={22}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+          </View>
 
           {auth.error ? (
             <Text style={[styles.error, { color: colors.error }]}>{auth.error}</Text>
@@ -122,6 +142,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 16,
+  },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingRight: spacing.sm,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 16,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    outlineStyle: "none" as any,
   },
   button: {
     borderRadius: radius.md,
