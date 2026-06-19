@@ -1,9 +1,5 @@
-import path from "node:path";
-import { config } from "dotenv";
+import "./load-env";
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-
-config({ path: path.resolve(process.cwd(), ".env.local") });
-config({ path: path.resolve(process.cwd(), "../.env.local") });
 
 let sql: NeonQueryFunction<false, false> | null = null;
 let schemaEnsured: Promise<void> | null = null;
@@ -21,7 +17,7 @@ function assertValidDatabaseUrl(url: string) {
     throw new Error(
       "DATABASE_URL no es válida: sigue con el placeholder @HOST de la documentación. " +
         "Copia la connection string real desde Neon (console.neon.tech → tu proyecto → Connect) " +
-        "y pégala en .env.local (raíz del repo o noteflow-api/.env.local). " +
+        "y pégala en .env.local (raíz del repo). " +
         "En Vercel, actualiza la variable en el proyecto noteflow-api.",
     );
   }
@@ -32,7 +28,7 @@ function getSql() {
     const url = process.env.DATABASE_URL;
     if (!url) {
       throw new Error(
-        "DATABASE_URL is not set. Add it in .env.local or Vercel → Settings → Environment Variables.",
+        "DATABASE_URL is not set. Add it in .env.local (repo root) or Vercel → Environment Variables.",
       );
     }
     assertValidDatabaseUrl(url);
@@ -65,12 +61,27 @@ async function ensureDbSchema() {
   await schemaEnsured;
 }
 
+export function formatDbError(error: unknown): string {
+  if (error instanceof Error) {
+    if (
+      error.message.includes("DATABASE_URL") ||
+      error.message.includes("relation") ||
+      error.message.includes("does not exist")
+    ) {
+      return error.message;
+    }
+  }
+  return "Error interno";
+}
+
 export async function query<T = unknown>(
   text: string,
   params?: unknown[],
 ): Promise<T[]> {
   await ensureDbSchema();
   const client = getSql();
-  const result = params ? await client.query(text, params) : await client.query(text);
+  const result = params
+    ? await client.query(text, params)
+    : await client.query(text);
   return result as T[];
 }

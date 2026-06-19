@@ -8,6 +8,10 @@ export function extractStorageKey(url: string): string | null {
     return null;
   }
 
+  if (/^(avatars|notes)\//.test(url)) {
+    return url;
+  }
+
   const proxied = url.match(/\/api\/media\/((?:avatars|notes)\/[^?#]+)/);
   if (proxied) {
     return decodeURIComponent(proxied[1]);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createLocalUploadUrls } from "@/lib/local-upload";
+import { buildPublicMediaUrl } from "@/lib/media-url";
 import { createPresignedUploadUrl, isS3Configured } from "@/lib/s3";
 import { isAuthResponse, requireAuth } from "@/lib/require-auth";
 
@@ -44,7 +45,11 @@ export async function POST(request: Request) {
     }
 
     const urls = await createPresignedUploadUrl(input);
-    return NextResponse.json(urls);
+    const apiOrigin = new URL(request.url).origin;
+    return NextResponse.json({
+      ...urls,
+      publicUrl: buildPublicMediaUrl(apiOrigin, urls.key),
+    });
   } catch (error) {
     console.error("[uploads/presign]", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

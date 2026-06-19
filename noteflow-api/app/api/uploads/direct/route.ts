@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildS3Key, isS3Configured, uploadObjectToS3 } from "@/lib/s3";
 import { saveLocalUpload } from "@/lib/local-upload";
+import { buildPublicMediaUrl } from "@/lib/media-url";
 import { isAuthResponse, requireAuth } from "@/lib/require-auth";
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -57,7 +58,11 @@ export async function POST(request: Request) {
         userId: auth.userId,
         body: buffer,
       });
-      return NextResponse.json(result);
+      const apiOrigin = new URL(request.url).origin;
+      return NextResponse.json({
+        publicUrl: buildPublicMediaUrl(apiOrigin, result.key),
+        key: result.key,
+      });
     }
 
     if (process.env.VERCEL) {
@@ -74,7 +79,7 @@ export async function POST(request: Request) {
     await saveLocalUpload(key, buffer);
     const apiOrigin = new URL(request.url).origin;
     return NextResponse.json({
-      publicUrl: `${apiOrigin}/uploads/${key}`,
+      publicUrl: buildPublicMediaUrl(apiOrigin, key),
       key,
     });
   } catch (error) {

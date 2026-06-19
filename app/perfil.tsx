@@ -22,17 +22,19 @@ import { updateUserProfile } from "../lib/firebaseAuth";
 import * as api from "../lib/api";
 import { TAB_ROUTES } from "../utils/routes";
 
-function mergeProfile(
-  user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>,
+type AuthUser = NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>;
+
+function profileFromApi(
   updated: api.AuthResponse["user"],
-  fallbackBio: string,
-): NonNullable<ReturnType<typeof useAuthStore.getState>["user"]> {
+  bio: string,
+  fallbackAvatarUrl: string | null,
+): AuthUser {
   return {
     id: updated.id,
     email: updated.email,
     name: updated.name,
-    bio: updated.bio ?? fallbackBio,
-    avatarUrl: updated.avatarUrl ?? user.avatarUrl,
+    bio: updated.bio ?? bio,
+    avatarUrl: updated.avatarUrl ?? fallbackAvatarUrl,
   };
 }
 
@@ -44,6 +46,7 @@ export default function ProfileScreen() {
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const logout = useAuthStore((s) => s.logout);
   const [previewAvatarUrl, setPreviewAvatarUrl] = useState<string | null>(null);
+  const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
   const [bio, setBio] = useState(user?.bio ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -58,49 +61,52 @@ export default function ProfileScreen() {
   }, [user?.bio]);
 
   const savedAvatarUrl = user?.avatarUrl ?? null;
-  const displayAvatarUrl = previewAvatarUrl ?? savedAvatarUrl;
+  const displayAvatarUrl =
+    previewAvatarUrl ?? pendingAvatarUrl ?? savedAvatarUrl;
+  const avatarChanged =
+    pendingAvatarUrl !== null && pendingAvatarUrl !== savedAvatarUrl;
   const bioChanged = bio.trim() !== (user?.bio ?? "");
-  const hasChanges = bioChanged;
+  const hasChanges = avatarChanged || bioChanged;
 
-  const handleAvatarUploaded = async (publicUrl: string) => {
-    if (!user) return;
-
-    setPreviewAvatarUrl(publicUrl);
-    setSaving(true);
-    try {
-      if (Platform.OS === "web") {
-        const updated = await api.updateProfile({ avatarUrl: publicUrl });
-        await setSession(mergeProfile(user, updated, bio.trim()));
-      } else {
-        await updateUserProfile(user.id, { avatarUrl: publicUrl });
-        await setSession({ ...user, avatarUrl: publicUrl });
-      }
-      setPreviewAvatarUrl(null);
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        error instanceof Error ? error.message : "No se pudo guardar la foto",
-      );
-    } finally {
-      setSaving(false);
-    }
+  const handleAvatarUploaded = (publicUrl: string) => {
+    setPreviewAvatarUrl(null);
+    setPendingAvatarUrl(publicUrl);
   };
 
   const handleAvatarPreview = (localUri: string) => {
     setPreviewAvatarUrl(localUri);
   };
 
+  const handleAvatarUploadError = () => {
+    setPreviewAvatarUrl(null);
+  };
+
   const handleSave = async () => {
     if (!user || !hasChanges) return;
     setSaving(true);
     try {
-      if (Platform.OS === "web") {
-        const updated = await api.updateProfile({ bio: bio.trim() });
-        await setSession(mergeProfile(user, updated, bio.trim()));
-      } else {
-        await updateUserProfile(user.id, { bio: bio.trim() });
-        await setSession({ ...user, bio: bio.trim() });
+      const patch: { bio: string; avatarUrl?: string } = {
+        bio: bio.trim(),
+      };
+      if (pendingAvatarUrl) {
+        patch.avatarUrl = pendingAvatarUrl;
       }
+
+      if (Platform.OS === "web") {
+        const updated = await api.updateProfile(patch);
+        const savedAvatar = pendingAvatarUrl ?? updated.avatarUrl ?? savedAvatarUrl;
+        await setSession(profileFromApi(updated, bio.trim(), savedAvatar));
+      } else {
+        await updateUserProfile(user.id, patch);
+        await setSession({
+          ...user,
+          bio: bio.trim(),
+          avatarUrl: pendingAvatarUrl ?? user.avatarUrl,
+        });
+      }
+
+      setPendingAvatarUrl(null);
+      setPreviewAvatarUrl(null);
       Alert.alert("Listo", "Cambios guardados");
     } catch (error) {
       Alert.alert(
@@ -113,15 +119,31 @@ export default function ProfileScreen() {
   };
 
   const performLogout = async () => {
+    if (hasChanges) {
+      const message =
+        "Tienes cambios sin guardar. ¿Quieres salir de todos modos?";
+      if (Platform.OS === "web") {
+        if (!globalThis.confirm?.(message)) return;
+      } else {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Alert.alert("Cambios sin guardar", message, [
+            { text: "Cancelar", style: "cancel", onPress: () => resolve(false) },
+            { text: "Salir", style: "destructive", onPress: () => resolve(true) },
+          ]);
+        });
+        if (!confirmed) return;
+      }
+    } else if (Platform.OS === "web") {
+      if (!globalThis.confirm?.("¿Quieres salir de tu cuenta?")) return;
+    }
+
     await logout();
     router.replace("/login");
   };
 
   const handleLogout = () => {
     if (Platform.OS === "web") {
-      if (globalThis.confirm?.("¿Quieres salir de tu cuenta?")) {
-        void performLogout();
-      }
+      void performLogout();
       return;
     }
 
@@ -199,8 +221,16 @@ export default function ProfileScreen() {
             folder="avatars"
             onPreview={handleAvatarPreview}
             onUploaded={handleAvatarUploaded}
+            onError={handleAvatarUploadError}
             variant="secondary"
           />
+
+          {hasChanges ? (
+            <Text style={[styles.hint, { color: colors.textSecondary }]}>
+              Pulsa «Guardar cambios» para guardar la biografía
+              {avatarChanged ? " y la foto de perfil" : ""}.
+            </Text>
+          ) : null}
 
           <Pressable
             style={[
@@ -275,6 +305,11 @@ const styles = StyleSheet.create({
   name: { ...typography.h3, textAlign: "center" },
   email: { ...typography.body, textAlign: "center", marginBottom: spacing.sm },
   label: { ...typography.caption, fontWeight: "600" },
+  hint: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+  },
   bioInput: {
     minHeight: 96,
     borderWidth: 1,

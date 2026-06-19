@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { buildPublicMediaUrl } from "./media-url";
 
 const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -20,7 +21,7 @@ export function createLocalUploadUrls(input: {
   const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const key = `${input.folder}/${input.userId}/${randomUUID()}-${safeName}`;
   const uploadUrl = `${input.apiOrigin}/api/uploads/local?key=${encodeURIComponent(key)}`;
-  const publicUrl = `${input.apiOrigin}/uploads/${key}`;
+  const publicUrl = buildPublicMediaUrl(input.apiOrigin, key);
 
   return { uploadUrl, publicUrl, key };
 }

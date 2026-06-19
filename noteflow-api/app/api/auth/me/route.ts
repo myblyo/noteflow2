@@ -40,14 +40,10 @@ export async function GET(request: Request) {
   }
 }
 
-const patchSchema = z
-  .object({
-    avatarUrl: z.string().min(1).optional(),
-    bio: z.string().max(500).optional(),
-  })
-  .refine((data) => data.avatarUrl !== undefined || data.bio !== undefined, {
-    message: "Indica avatarUrl o bio para actualizar",
-  });
+const patchSchema = z.object({
+  avatarUrl: z.string().min(1).optional(),
+  bio: z.string().max(500).optional(),
+});
 
 export async function PATCH(request: Request) {
   const auth = await requireAuth(request);
@@ -73,6 +69,11 @@ export async function PATCH(request: Request) {
       params.push(result.data.bio);
       sets.push(`bio = $${params.length}`);
     }
+
+    if (sets.length === 0) {
+      return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+    }
+
     params.push(auth.userId);
 
     const [user] = await query<UserRow>(

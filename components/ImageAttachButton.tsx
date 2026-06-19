@@ -17,6 +17,7 @@ type ImageAttachButtonProps = {
   folder: UploadFolder;
   onUploaded: (publicUrl: string) => void | Promise<void>;
   onPreview?: (localUri: string) => void;
+  onError?: () => void;
   variant?: "primary" | "secondary";
 };
 
@@ -25,6 +26,7 @@ export function ImageAttachButton({
   folder,
   onUploaded,
   onPreview,
+  onError,
   variant = "secondary",
 }: ImageAttachButtonProps) {
   const colors = useThemeColors();
@@ -52,6 +54,7 @@ export function ImageAttachButton({
 
       await onUploaded(publicUrl);
     } catch (error) {
+      onError?.();
       Alert.alert(
         "Error al subir",
         error instanceof Error ? error.message : "No se pudo subir la imagen",

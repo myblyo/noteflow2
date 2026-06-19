@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { query } from "@/lib/db";
+import { internalErrorResponse } from "@/lib/api-error";
 import { hashPassword, signToken } from "@/lib/auth";
 
 const registerSchema = z.object({
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("[auth/register]", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    const { message, status } = internalErrorResponse(error, "[auth/register]");
+    return NextResponse.json({ error: message }, { status });
   }
 }

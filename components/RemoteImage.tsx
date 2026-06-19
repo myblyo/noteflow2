@@ -1,4 +1,4 @@
-import React, { createElement, useState } from "react";
+import React, { createElement, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -44,6 +44,11 @@ export function RemoteImage({
   const [failed, setFailed] = useState(false);
   const displayUri = resolveMediaUrl(uri) ?? uri;
 
+  useEffect(() => {
+    setLoading(Boolean(displayUri));
+    setFailed(false);
+  }, [displayUri]);
+
   if (!uri) {
     return (
       <View style={[styles.fallback, style, { backgroundColor: colors.accentLight }]}>
@@ -79,7 +84,7 @@ export function RemoteImage({
             display: "block",
           },
         })}
-        {loading ? (
+        {loading && !failed ? (
           <View style={[styles.overlay, { backgroundColor: colors.surface }]}>
             <ActivityIndicator size="small" color={colors.accent} />
           </View>
