@@ -9,6 +9,7 @@
     "android:setup-win": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-windows-android.ps1",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "expo export -p web",
     "api": "npm run dev --prefix noteflow-api",
     "api:start": "npm run start --prefix noteflow-api",
     "db:test": "npm run db:test --prefix server",

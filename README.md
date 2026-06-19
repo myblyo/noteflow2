@@ -162,8 +162,27 @@ Asegúrate de tener `ANDROID_HOME` en el PATH y un emulador o dispositivo conect
 
 ## Despliegue
 
-- **API:** despliega `noteflow-api/` en Vercel (root directory = `noteflow-api`). Configura `DATABASE_URL` y `JWT_SECRET`.
-- **App:** builds con [EAS Build](https://docs.expo.dev/build/introduction/) (`eas.json` incluido). Actualiza `EXPO_PUBLIC_API_URL` con la URL de producción de la API.
+Necesitas **dos proyectos en Vercel** (o uno para la API y otro para la web):
+
+### 1. API (backend)
+
+1. Importa el repo en [vercel.com/new](https://vercel.com/new).
+2. **Root Directory:** `noteflow-api`
+3. Variables: `DATABASE_URL`, `JWT_SECRET` (+ S3/Firebase si aplica).
+4. Deploy.
+
+### 2. App web (Expo)
+
+1. Crea **otro** proyecto en Vercel con el mismo repo.
+2. **Root Directory:** deja la raíz del repo (`.`), no `noteflow-api`.
+3. Vercel usará `vercel.json` → `npm run build:web` → carpeta `dist/`.
+4. Variable de entorno:
+   - `EXPO_PUBLIC_API_URL` = `https://TU-API.vercel.app/api`
+5. Deploy.
+
+> No despliegues la raíz sin `build:web`: Vercel podría mostrar código suelto (`index.ts`) en lugar de la app.
+
+- **App móvil (iOS/Android):** builds con [EAS Build](https://docs.expo.dev/build/introduction/) (`eas.json` incluido). En producción usa la misma `EXPO_PUBLIC_API_URL`.
 
 ## Licencia
 
