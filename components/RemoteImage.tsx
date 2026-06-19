@@ -18,6 +18,10 @@ type RemoteImageProps = {
   contentFit?: ImageContentFit;
   placeholder?: React.ReactNode;
   recyclingKey?: string;
+  /** Ocultar spinner de carga (útil en avatares pequeños). */
+  showLoading?: boolean;
+  /** Ocultar overlay de error (útil en avatares con fallback externo). */
+  showErrorOverlay?: boolean;
 };
 
 function flattenSize(style: StyleProp<ViewStyle>): { width?: number; height?: number; borderRadius?: number } {
@@ -38,16 +42,34 @@ export function RemoteImage({
   contentFit = "cover",
   placeholder,
   recyclingKey,
+  showLoading = true,
+  showErrorOverlay = true,
 }: RemoteImageProps) {
   const colors = useThemeColors();
-  const [loading, setLoading] = useState(Boolean(uri));
+  const [loading, setLoading] = useState(showLoading && Boolean(uri));
   const [failed, setFailed] = useState(false);
   const displayUri = resolveMediaUrl(uri) ?? uri;
 
   useEffect(() => {
-    setLoading(Boolean(displayUri));
+    setLoading(showLoading && Boolean(displayUri));
     setFailed(false);
-  }, [displayUri]);
+  }, [displayUri, showLoading]);
+
+  const markLoaded = () => {
+    setFailed(false);
+    setLoading(false);
+  };
+
+  const markFailed = () => {
+    setLoading(false);
+    setFailed(true);
+  };
+
+  const checkAlreadyLoaded = (node: HTMLImageElement | null) => {
+    if (node?.complete && node.naturalWidth > 0) {
+      markLoaded();
+    }
+  };
 
   if (!uri) {
     return (
@@ -68,14 +90,9 @@ export function RemoteImage({
           key: recyclingKey ?? displayUri,
           src: displayUri,
           alt: "",
-          onLoad: () => {
-            setFailed(false);
-            setLoading(false);
-          },
-          onError: () => {
-            setLoading(false);
-            setFailed(true);
-          },
+          ref: checkAlreadyLoaded,
+          onLoad: markLoaded,
+          onError: markFailed,
           style: {
             width: size.width ?? "100%",
             height: size.height ?? "100%",
@@ -84,12 +101,12 @@ export function RemoteImage({
             display: "block",
           },
         })}
-        {loading && !failed ? (
+        {showLoading && loading && !failed ? (
           <View style={[styles.overlay, { backgroundColor: colors.surface }]}>
             <ActivityIndicator size="small" color={colors.accent} />
           </View>
         ) : null}
-        {failed ? (
+        {showErrorOverlay && failed ? (
           <View style={[styles.overlay, { backgroundColor: colors.surfaceSecondary }]}>
             <Ionicons name="image-outline" size={22} color={colors.textTertiary} />
           </View>
@@ -108,21 +125,19 @@ export function RemoteImage({
         transition={200}
         recyclingKey={recyclingKey ?? displayUri}
         onLoadStart={() => {
+          if (!showLoading) return;
           setFailed(false);
           setLoading(true);
         }}
-        onLoad={() => setLoading(false)}
-        onError={() => {
-          setLoading(false);
-          setFailed(true);
-        }}
+        onLoad={markLoaded}
+        onError={markFailed}
       />
-      {loading ? (
+      {showLoading && loading ? (
         <View style={[styles.overlay, { backgroundColor: colors.surface }]}>
           <ActivityIndicator size="small" color={colors.accent} />
         </View>
       ) : null}
-      {failed ? (
+      {showErrorOverlay && failed ? (
         <View style={[styles.overlay, { backgroundColor: colors.surfaceSecondary }]}>
           <Ionicons name="image-outline" size={22} color={colors.textTertiary} />
         </View>

@@ -44,6 +44,8 @@ export function ProfileNavButton({ size = 40, style }: ProfileNavButtonProps) {
           }}
           contentFit="cover"
           recyclingKey={avatarUrl}
+          showLoading={false}
+          showErrorOverlay={false}
         />
       ) : (
         <Ionicons name="person-circle-outline" size={iconSize} color={colors.accent} />
