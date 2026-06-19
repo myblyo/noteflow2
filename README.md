@@ -175,7 +175,11 @@ Necesitas **dos proyectos en Vercel** (o uno para la API y otro para la web):
 
 1. Crea **otro** proyecto en Vercel con el mismo repo.
 2. **Root Directory:** deja la raíz del repo (`.`), no `noteflow-api`.
-3. Vercel usará `vercel.json` → `npm run build:web` → carpeta `dist/`.
+3. En **Settings → General → Build & Development**, si no puedes editar los campos, sube el archivo de config:
+   - Renombra `vercel.web.json` → `vercel.json` en la raíz (solo en el proyecto web), **o** pega estos valores si Vercel te deja override:
+   - **Build Command:** `npm run build:web`
+   - **Output Directory:** `dist`
+   - **Framework:** Other
 4. Variable de entorno:
    - `EXPO_PUBLIC_API_URL` = `https://TU-API.vercel.app/api`
 5. Deploy.
