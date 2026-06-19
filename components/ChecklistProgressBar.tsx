@@ -27,19 +27,21 @@ export function ChecklistProgressBar({
         style={[
           styles.track,
           compact ? styles.trackCompact : styles.trackFull,
-          { backgroundColor: colors.surfaceSecondary },
+          { backgroundColor: colors.textTertiary },
         ]}
       >
-        <View
-          style={[
-            styles.fill,
-            compact ? styles.fillCompact : styles.fillFull,
-            {
-              backgroundColor: colors.accent,
-              width: `${ratio * 100}%`,
-            },
-          ]}
-        />
+        {ratio > 0 && (
+          <View
+            style={[
+              styles.fill,
+              compact ? styles.fillCompact : styles.fillFull,
+              {
+                backgroundColor: colors.accent,
+                width: `${ratio * 100}%`,
+              },
+            ]}
+          />
+        )}
       </View>
       {showLabel && (
         <Text
