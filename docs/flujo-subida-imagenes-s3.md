@@ -1,150 +1,136 @@
-# Flujo de subida y visualización de imágenes (S3)
+# Flujo de subida y visualización de imágenes
 
-Este documento describe el recorrido de un archivo desde que el usuario pulsa **«Subir foto»** / **«Cambiar foto de perfil»** hasta que la imagen aparece en pantalla consumiendo la URL pública de AWS S3.
+Recorrido completo desde que el usuario elige una foto hasta que aparece en pantalla (perfil, notas, barra lateral).
 
 ---
 
-## Diagrama de flujo
+## Diagrama (web)
 
 ```mermaid
 sequenceDiagram
   actor U as Usuario
-  participant App as App React Native
-  participant Picker as expo-image-picker
-  participant API as Next.js API
-  participant S3 as AWS S3
-  participant DB as Firestore / PostgreSQL
-  participant Img as RemoteImage (expo-image)
+  participant App as App (Expo web)
+  participant API as noteflow-api
+  participant S3 as AWS S3 / disco local
+  participant DB as Neon PostgreSQL
 
-  U->>App: Click "Subir foto" / "Cambiar foto"
-  App->>Picker: requestMediaLibraryPermissionsAsync()
-  Picker-->>App: granted / denied
-  alt Permiso denegado
-    App-->>U: Alert "Necesitamos acceso a la galería"
-  else Permiso concedido
-    App->>Picker: launchImageLibraryAsync()
-    Picker-->>App: localUri (assets[0].uri)
-    App->>API: POST /api/uploads/presign<br/>Authorization: Bearer token
-    API->>API: Verificar sesión (Firebase / JWT)
-    API->>S3: Generar Presigned URL (PUT, ~5 min)
-    API-->>App: { uploadUrl, publicUrl }
-    App->>App: fetch(localUri) → blob
-    App->>S3: PUT uploadUrl + Content-Type + body
-    S3-->>App: 200 OK
-    alt Avatar (perfil)
-      App->>DB: Firestore users/{uid}.avatarUrl = publicUrl
-    else Adjunto de nota
-      App->>API: POST /api/notes/{id}/attachments { url: publicUrl }
-      API->>DB: INSERT note_attachments (Neon)
-    end
-    App->>App: Actualizar estado local (avatarUrl / imageUrls)
-    App->>Img: Render con uri = publicUrl
-    Img->>S3: GET imagen (caché memory-disk)
-    Img-->>U: Imagen visible + placeholder mientras carga
-  end
+  U->>App: Cambiar foto de perfil
+  App->>App: Vista previa (blob local)
+  App->>API: POST /api/uploads/direct (multipart + Bearer)
+  API->>S3: PutObject (o saveLocalUpload)
+  API-->>App: { publicUrl: /api/media/avatars/... }
+  App->>App: pendingAvatarUrl = publicUrl
+  U->>App: Guardar cambios
+  App->>API: PATCH /api/auth/me { bio, avatarUrl }
+  API->>DB: UPDATE users SET avatar_url, bio
+  API-->>App: { user: { avatarUrl, bio, ... } }
+  App->>API: GET /api/media/avatars/...
+  API->>S3: GetObject (o readLocalUpload)
+  API-->>App: bytes imagen
+  App-->>U: Foto visible en perfil y barra lateral
 ```
 
 ---
 
-## Vista simplificada (capas)
+## Diagrama (móvil nativo)
+
+```mermaid
+sequenceDiagram
+  participant App as App móvil
+  participant API as noteflow-api
+  participant S3 as AWS S3
+  participant FS as Firestore
+
+  App->>API: POST /api/uploads/presign
+  API-->>App: { uploadUrl, publicUrl, key }
+  App->>S3: PUT uploadUrl
+  App->>FS: updateUserProfile { avatarUrl }
+  App->>API: GET /api/media/avatars/...
+  API-->>App: imagen
+```
+
+---
+
+## Capas simplificadas
 
 ```
 [ Usuario ]
      │
-     ▼ Click "Subir foto"
-[ expo-image-picker ] ──► URI local (file://...)
+     ▼ Elegir imagen
+[ ImageAttachButton + lib/s3Upload.ts ]
+     │  Web:  POST /api/uploads/direct
+     │  Móvil: POST /api/uploads/presign → PUT S3
+     ▼
+[ Almacenamiento ]  S3 (prod) o noteflow-api/public/uploads/ (dev sin AWS)
      │
+     ▼ publicUrl = https://API/api/media/avatars/{userId}/{uuid}-file.jpg
+[ Base de datos ]
+     │  Web avatar  → PostgreSQL users.avatar_url
+     │  Web notas   → PostgreSQL note_attachments.url + content JSON
+     │  Móvil avatar → Firestore users/{uid}.avatarUrl
      ▼
-[ lib/s3Upload.ts · uploadToS3 / uploadToAWS ]
-     │  1. POST presign (backend autenticado)
-     │  2. fetch(uri) → Blob
-     │  3. PUT → S3 Presigned URL
+[ lib/mediaUrl.ts → resolveMediaUrl() ]
      ▼
-[ AWS S3 ] ──► almacena bytes del archivo
-     │
-     ▼ publicUrl (https://bucket.s3.../avatars/uid/uuid.jpg)
-[ Base de datos ] ──► solo guarda la URL (no el archivo)
-     │   • Avatar  → Firestore `users/{uid}.avatarUrl`
-     │   • Nota    → PostgreSQL `note_attachments.url`
+[ RemoteImage / editor HTML ]
      ▼
-[ components/RemoteImage.tsx ]
-     │  expo-image + cachePolicy memory-disk + placeholder
-     ▼
-[ Pantalla ] ──► usuario ve la imagen
+[ Pantalla ]
 ```
 
 ---
 
-## Código de referencia en el repo
+## Perfil (web)
 
-### 1. Subida directa a S3 (`lib/uploadToAWS.ts`)
+Pantalla: `app/perfil.tsx`
 
-Equivalente al snippet del curso:
+1. Usuario elige foto → subida inmediata a S3/local (aún **no** persiste en BD).
+2. Usuario edita biografía (opcional).
+3. **Guardar cambios** → `PATCH /api/auth/me` con `{ bio, avatarUrl }`.
+4. `setSession` actualiza Zustand + `sessionStorage`.
+5. Tras logout/login, `POST /api/auth/login` devuelve `user.avatarUrl`.
 
-```typescript
-// 1. Obtener URL firmada desde el backend + subir a S3
-const publicUrl = await uploadToAWS(localUri, {
-  folder: "avatars",
-  fileName: "avatar.jpg",
-  contentType: "image/jpeg",
-});
-
-// 2. Avatar: actualizar Firestore (también disponible como uploadAvatarToAWS)
-await updateUserAvatarUrl(userId, publicUrl);
-```
-
-Implementación interna (`lib/s3Upload.ts`):
-
-1. `POST /api/uploads/presign` con token de sesión.
-2. `fetch(localUri)` → `blob`.
-3. `fetch(uploadUrl, { method: "PUT", body: blob, headers: { Content-Type } })`.
-
-### 2. Renderizado remoto con caché (`components/RemoteImage.tsx`)
-
-```tsx
-<RemoteImage
-  uri={userProfile.avatarUrl}
-  style={{ width: 100, height: 100, borderRadius: 50 }}
-/>
-```
-
-Usa `expo-image` con:
-
-- `cachePolicy="memory-disk"` — caché en memoria y disco.
-- `transition={200}` — fundido al terminar la descarga.
-- `ActivityIndicator` — placeholder mientras la red trae el archivo desde AWS.
-
-### 3. Pantallas
-
-| Pantalla | Archivo | Acción |
-|----------|---------|--------|
-| Perfil | `app/perfil.tsx` | Avatar + biografía → Firestore (móvil) o PostgreSQL (web) |
-| Nota | `app/nota/[id].tsx` | Adjuntar → PostgreSQL |
+Avatar en barra lateral: `components/ProfileNavButton.tsx` (sin spinner de carga).
 
 ---
 
-## Endpoints del backend
+## Notas con imágenes (web)
+
+- Editor: `components/NoteRichEditor/NoteRichEditor.web.tsx`
+- HTML/imágenes: `utils/noteDocumentHtml.ts`
+- Tras subir imagen en el editor, `onAutoPersist` guarda el contenido de la nota.
+
+---
+
+## Endpoints
 
 | Método | Ruta | Función |
 |--------|------|---------|
-| `POST` | `/api/uploads/presign` | Usuario autenticado → Presigned URL |
-| `POST` | `/api/notes/{id}/attachments` | Guardar URL del adjunto en Neon |
-| `GET` | `/api/notes/{id}/attachments` | Listar URLs de adjuntos |
+| `POST` | `/api/uploads/direct` | Subida server-side (web/Vercel) |
+| `POST` | `/api/uploads/presign` | URL firmada (móvil) |
+| `PUT` | `/api/uploads/local?key=...` | Almacenamiento local (dev) |
+| `GET` | `/api/media/[...path]` | Proxy de imagen (S3 o disco) |
+| `PATCH` | `/api/auth/me` | Guardar `avatarUrl` y `bio` |
+| `POST` | `/api/notes/{id}/attachments` | Adjunto de nota en Neon |
+
+---
+
+## Archivos clave
+
+| Archivo | Rol |
+|---------|-----|
+| `lib/s3Upload.ts` | Cliente de subida |
+| `lib/mediaUrl.ts` | `resolveMediaUrl()` para `<img>` / expo-image |
+| `noteflow-api/lib/media-url.ts` | `buildPublicMediaUrl()` en servidor |
+| `components/RemoteImage.tsx` | Imagen con caché; props `showLoading` |
+| `components/ImageAttachButton.tsx` | Botón elegir + subir |
+| `app/perfil.tsx` | Flujo bio + avatar |
 
 ---
 
 ## Requisitos
 
-1. **AWS S3** configurado en `.env.local` (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, …).
-2. **API en marcha:** `npm run api`.
-3. **Migración:** `npm run db:migrate` (tabla `note_attachments`).
-4. **Sesión activa** — el presign exige `Authorization: Bearer <token>`.
+1. API en marcha: `npm run api`
+2. Sesión activa (`Authorization: Bearer`)
+3. En Vercel: variables `AWS_*` en proyecto **API**
+4. Migración: `npm run db:migrate` (columna `users.avatar_url`, `users.bio`)
 
----
-
-## Seguridad
-
-- Las credenciales de AWS **nunca** van en la app móvil.
-- La app solo recibe una **URL temporal firmada** (Presigned URL) válida unos minutos.
-- El backend comprueba que el usuario está logueado antes de generar la URL.
-- En S3 las claves incluyen el `userId`: `avatars/{userId}/…`, `notes/{userId}/…`.
+Configuración S3: [`configuracion-aws-s3.md`](./configuracion-aws-s3.md)

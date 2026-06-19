@@ -2,9 +2,11 @@
 
 NoteFlow en **iOS/Android** usa **Firebase Auth** para identidad y **Firestore** para el perfil extendido (nombre, biografía, foto). Las notas se guardan en **PostgreSQL (Neon)** vía la API, filtradas por usuario.
 
+En **web**, la autenticación es **JWT** contra la API (sin Firebase).
+
 ---
 
-## Diagrama de flujo
+## Diagrama de flujo (móvil)
 
 ```mermaid
 sequenceDiagram
@@ -12,7 +14,7 @@ sequenceDiagram
   participant App as App móvil
   participant Auth as Firebase Auth
   participant FS as Firestore
-  participant API as Next.js API
+  participant API as noteflow-api
   participant DB as Neon PostgreSQL
 
   U->>App: Registrarse
@@ -22,15 +24,21 @@ sequenceDiagram
   App->>Auth: getIdToken()
   App->>API: GET /api/notes (Bearer Firebase token)
   API->>Auth: verifyFirebaseIdToken
-  API->>DB: resolveNeonUserId(uid) → user_id
+  API->>DB: resolveNeonUserId(uid)
   API->>DB: SELECT notes WHERE user_id = ...
-  DB-->>App: Solo notas del usuario
-
-  U->>App: Login
-  App->>Auth: signInWithEmailAndPassword
-  App->>FS: fetchUserProfile(uid)
-  FS-->>App: { name, bio, avatarUrl }
 ```
+
+---
+
+## Web vs móvil
+
+| | Web | Móvil nativo |
+|---|-----|--------------|
+| Auth | JWT (`POST /api/auth/login`) | Firebase Auth |
+| Token | `sessionStorage` + Secure Store | Firebase ID Token |
+| Perfil (bio, avatar) | PostgreSQL `users` | Firestore `users/{uid}` |
+| Notas | PostgreSQL vía API | PostgreSQL vía API (token Firebase) |
+| Imágenes | S3 + `/api/media` + PostgreSQL | S3 + Firestore/PostgreSQL |
 
 ---
 
@@ -40,8 +48,8 @@ sequenceDiagram
 
 1. [console.firebase.google.com](https://console.firebase.google.com)
 2. Proyecto: `noteflow2-18554` (o el tuyo)
-3. **Authentication → Sign-in method → Email/Password** → Activar
-4. **Firestore Database → Create database**
+3. **Authentication → Email/Password** → Activar
+4. **Firestore Database** → Crear
 
 ### 2. Reglas Firestore (desarrollo)
 
@@ -58,79 +66,13 @@ service cloud.firestore {
 
 ### 3. Archivos nativos
 
-En la raíz del proyecto:
+En la raíz: `google-services.json`, `GoogleService-Info.plist`.
 
-- `google-services.json` (Android)
-- `GoogleService-Info.plist` (iOS)
+Plugins en `app.json`: `@react-native-firebase/app`, `@react-native-firebase/auth`.
 
-Configurados en `app.json`:
+### 4. Development Build
 
-```json
-"plugins": [
-  "@react-native-firebase/app",
-  "@react-native-firebase/auth"
-]
-```
-
-### 4. Development Build (obligatorio)
-
-`@react-native-firebase` **no funciona en Expo Go**. Usa EAS:
-
-```bash
-npm install -g eas-cli
-eas login
-eas build --profile development --platform android
-```
-
----
-
-## Registro (Firebase + Firestore)
-
-Implementado en `lib/firebaseAuth.ts`:
-
-```typescript
-const userCredential = await auth().createUserWithEmailAndPassword(email, password);
-await firestore().collection("users").doc(userId).set({
-  name,
-  email,
-  bio: "",
-  avatarUrl: null,
-  createdAt: firestore.FieldValue.serverTimestamp(),
-});
-```
-
-Pantallas: `app/register.tsx`, `app/login.tsx`
-
----
-
-## Protección de rutas
-
-`app/_layout.tsx` escucha la sesión:
-
-```typescript
-auth().onAuthStateChanged(async (firebaseUser) => {
-  if (firebaseUser) {
-    const profile = await fetchUserProfile(firebaseUser.uid);
-    await setSession(profile ?? mapFirebaseUser(firebaseUser));
-  } else {
-    await setSession(null);
-  }
-});
-```
-
-Si no hay usuario → redirige a `/login`.
-
----
-
-## Notas por usuario (móvil → API → Neon)
-
-1. Tras login, la app guarda el **Firebase ID Token**.
-2. Cada petición a la API lleva `Authorization: Bearer <token>`.
-3. `noteflow-api/lib/require-auth.ts` verifica el token Firebase.
-4. `noteflow-api/lib/firebase-user.ts` enlaza `firebase_uid` con un usuario en Neon.
-5. Las notas se filtran con `WHERE user_id = $1`.
-
-Así **cada persona solo ve sus notas**, aunque compartan la misma base de datos.
+`@react-native-firebase` **no funciona en Expo Go**. Usa EAS Build o `npx expo run:android`.
 
 ---
 
@@ -143,29 +85,48 @@ Así **cada persona solo ve sus notas**, aunque compartan la misma base de datos
 | bio | `users/{uid}.bio` | `users.bio` |
 | avatarUrl | `users/{uid}.avatarUrl` | `users.avatar_url` |
 
-Pantalla: `app/perfil.tsx` — editar biografía, foto, guardar, cerrar sesión.
+Pantalla: `app/perfil.tsx`
+
+**Web:** elegir foto → **Guardar cambios** → `PATCH /api/auth/me`.
+
+**Móvil:** elegir foto → **Guardar cambios** → `updateUserProfile()` en Firestore.
+
+La URL del avatar apunta a `/api/media/avatars/...` (ver [`flujo-subida-imagenes-s3.md`](./flujo-subida-imagenes-s3.md)).
 
 ---
 
-## Web vs móvil
+## Notas por usuario (móvil → API → Neon)
 
-| | Web | Móvil |
-|---|-----|-------|
-| Auth | JWT (API) | Firebase Auth |
-| Perfil | PostgreSQL | Firestore |
-| Notas | PostgreSQL | PostgreSQL (vía token Firebase) |
-| Imágenes | S3 + PostgreSQL | S3 + Firestore/PostgreSQL |
+1. Tras login, la app obtiene el **Firebase ID Token**.
+2. Peticiones API: `Authorization: Bearer <token>`.
+3. `noteflow-api/lib/require-auth.ts` verifica JWT o token Firebase.
+4. `noteflow-api/lib/firebase-user.ts` enlaza `firebase_uid` con usuario Neon.
+5. Notas filtradas: `WHERE user_id = $1`.
 
 ---
 
-## Guion de demo para entrega
+## Protección de rutas
 
-1. Instalar **Development Build** (APK) en el móvil.
-2. Configurar `EXPO_PUBLIC_API_URL` apuntando a la API (local o Vercel).
-3. **Registrar** usuario A → crear nota → cerrar sesión.
-4. **Registrar** usuario B → comprobar que **no** ve la nota de A.
-5. **Perfil** → biografía + foto → guardar → recargar app.
-6. Adjuntar imagen a una nota → ver con `RemoteImage`.
+`app/_layout.tsx` — en nativo escucha `auth().onAuthStateChanged`; en web usa `initWeb()` del store (JWT + `GET /api/auth/me`).
+
+---
+
+## Variables de entorno
+
+```env
+EXPO_PUBLIC_API_URL=http://TU-IP:3000/api    # o URL Vercel de la API
+FIREBASE_PROJECT_ID=noteflow2-18554           # API verifica tokens móvil
+```
+
+---
+
+## Guion de demo
+
+1. Development Build en móvil + API accesible (local o Vercel).
+2. Registrar usuario A → crear nota → logout.
+3. Registrar usuario B → no debe ver notas de A.
+4. Perfil → foto + bio → **Guardar cambios** → logout → login → foto visible.
+5. Adjuntar imagen a nota.
 
 ---
 
@@ -174,9 +135,10 @@ Pantalla: `app/perfil.tsx` — editar biografía, foto, guardar, cerrar sesión.
 | Archivo | Rol |
 |---------|-----|
 | `lib/firebaseAuth.ts` | Auth, registro, perfil Firestore |
-| `store/authStore.ts` | Estado global de sesión |
+| `store/authStore.ts` | Sesión global (web + nativo) |
 | `app/_layout.tsx` | Guard de rutas |
 | `noteflow-api/lib/firebase-user.ts` | Puente Firebase → Neon |
 | `noteflow-api/lib/require-auth.ts` | JWT o Firebase token |
+| `noteflow-api/lib/firebase-admin.ts` | Verificación ID token |
 
-Imágenes S3: [`configuracion-aws-s3.md`](./configuracion-aws-s3.md)
+Imágenes: [`configuracion-aws-s3.md`](./configuracion-aws-s3.md)

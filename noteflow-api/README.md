@@ -1,298 +1,182 @@
 # Noteflow API
 
-Backend REST de **Noteflow** construido con **Next.js App Router**, **Neon PostgreSQL** y autenticación **JWT**.
+Backend REST de **Noteflow** — **Next.js App Router**, **Neon PostgreSQL**, autenticación **JWT** (web) y **Firebase** (móvil).
 
-## Descripción
-
-La API persiste notas, ideas y checklists en una tabla unificada `notes`, con etiquetas (`note_tags`) e items de checklist (`checklist_items`) relacionados por clave foránea y `ON DELETE CASCADE`.
-
-Todos los endpoints de notas requieren autenticación mediante `Authorization: Bearer <token>`.
+Persiste notas, ideas y checklists en la tabla `notes`, con `note_tags`, `checklist_items` y `note_attachments`. Imágenes en **AWS S3** (o disco local en dev) servidas vía **`GET /api/media/...`**.
 
 ---
 
-## Setup paso a paso
+## Setup
 
-### 1. Requisitos
+### Requisitos
 
 - Node.js 20+
-- Cuenta en [Neon](https://neon.tech) con un proyecto PostgreSQL
-- (Producción) Cuenta en [Vercel](https://vercel.com)
+- Proyecto [Neon](https://neon.tech)
+- (Producción) [Vercel](https://vercel.com) + AWS S3
 
-### 2. Instalar dependencias
-
-```bash
-cd noteflow-api
-npm install
-```
-
-### 3. Variables de entorno
-
-Copia la plantilla y rellena los valores en `.env.local` en la **raíz del monorepo** (`noteflow2/.env.local`) o en `noteflow-api/.env.local`:
-
-```env
-DATABASE_URL=postgresql://USER:PASSWORD@HOST/neondb?sslmode=require
-JWT_SECRET=una-clave-larga-y-aleatoria
-```
-
-| Variable | Dónde | Descripción |
-|----------|-------|-------------|
-| `DATABASE_URL` | Solo servidor | Connection string de Neon |
-| `JWT_SECRET` | Solo servidor | Firma de tokens JWT (mín. 32 caracteres en producción) |
-
-### 4. Migrar el esquema
+### Instalación
 
 Desde la raíz del monorepo:
 
 ```bash
+npm install
 npm run db:migrate
-```
-
-Crea las tablas `users`, `notes`, `note_tags`, `checklist_items`, etc.
-
-### 5. Arrancar en desarrollo
-
-```bash
-cd noteflow-api
-npm run dev
+npm run api
 ```
 
 API local: `http://localhost:3000/api`
 
-### 6. Desplegar en Vercel
+### Variables de entorno
 
-1. Importa el repositorio en [vercel.com/new](https://vercel.com/new).
-2. Establece **Root Directory** en `noteflow-api`.
-3. En **Environment Variables** añade:
-   - `DATABASE_URL` — connection string de Neon (usa el **pooler**)
-   - `JWT_SECRET` — clave secreta para JWT
-4. Deploy.
-
-Verifica tras el deploy:
-
-```bash
-curl https://TU-PROYECTO.vercel.app/api
-curl -X POST https://TU-PROYECTO.vercel.app/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test","email":"test@example.com","password":"secret12"}'
-```
-
-Actualiza la app Expo:
+Archivo **`.env.local` en la raíz del monorepo** (`noteflow2/.env.local`):
 
 ```env
-EXPO_PUBLIC_API_URL=https://TU-PROYECTO.vercel.app/api
+DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+JWT_SECRET=clave-aleatoria-32-bytes-minimo
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=eu-north-1
+AWS_S3_BUCKET=noteflow2-images
+FIREBASE_PROJECT_ID=noteflow2-18554
+```
+
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Connection string Neon (**pooler**) |
+| `JWT_SECRET` | Firma JWT; fallback dev si falta |
+| `AWS_*` | Subida y lectura S3; omitir en dev local → disco |
+| `FIREBASE_PROJECT_ID` | Verificar tokens Firebase (móvil) |
+
+Carga: `lib/load-env.ts`, `next.config.ts`.
+
+### Health check
+
+```bash
+curl http://localhost:3000/api/health
+# {"ok":true,"db":true}
 ```
 
 ---
 
-## Endpoints
+## Despliegue en Vercel
 
-Cabecera común para rutas protegidas:
+1. [vercel.com/new](https://vercel.com/new) → mismo repo
+2. **Root Directory:** `noteflow-api`
+3. Variables: `DATABASE_URL`, `JWT_SECRET`, `AWS_*`
+4. Deploy → verifica `/api/health`
+
+App web (otro proyecto Vercel, raíz del repo):
+
+```env
+EXPO_PUBLIC_API_URL=https://TU-API.vercel.app/api
+```
+
+---
+
+## Autenticación
+
+Cabecera en rutas protegidas:
 
 ```http
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-### `GET /api`
+| Plataforma | Token |
+|------------|-------|
+| Web | JWT de `/api/auth/login` |
+| Móvil | Firebase ID Token |
 
-**Auth:** no
+---
 
-**Respuesta `200`:**
+## Endpoints principales
+
+### Sistema
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/api` | No | Info del servicio |
+| `GET` | `/api/health` | No | Estado + conexión DB |
+
+### Auth
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `POST` | `/api/auth/register` | No | Registro → `{ token, user }` |
+| `POST` | `/api/auth/login` | No | Login → `{ token, user }` |
+| `GET` | `/api/auth/me` | Sí | Perfil actual |
+| `PATCH` | `/api/auth/me` | Sí | Actualizar `{ bio?, avatarUrl? }` |
+
+**Respuesta user:**
 
 ```json
 {
-  "service": "noteflow-api",
-  "status": "ok",
-  "endpoints": { ... }
+  "id": "uuid",
+  "email": "user@example.com",
+  "name": "Nombre",
+  "bio": "Mi bio",
+  "avatarUrl": "https://api.example.com/api/media/avatars/userId/file.jpg"
 }
 ```
 
----
+### Imágenes
 
-### `POST /api/auth/register`
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `POST` | `/api/uploads/direct` | Sí | Subida multipart (web) |
+| `POST` | `/api/uploads/presign` | Sí | Presigned URL (móvil) |
+| `GET` | `/api/media/[...path]` | No | Proxy S3 / disco local |
 
-**Auth:** no
+### Notas
 
-**Body:**
+| Método | Ruta | Auth |
+|--------|------|------|
+| `GET` | `/api/notes` | Sí |
+| `POST` | `/api/notes` | Sí |
+| `GET` | `/api/notes/:id` | Sí |
+| `PATCH` | `/api/notes/:id` | Sí |
+| `DELETE` | `/api/notes/:id` | Sí |
+| `GET/POST` | `/api/notes/:id/attachments` | Sí |
+| `GET/POST` | `/api/notes/:id/checklist-items` | Sí |
+| `PATCH/DELETE` | `/api/checklist-items/:itemId` | Sí |
 
-```json
-{
-  "name": "María",
-  "email": "maria@example.com",
-  "password": "secret12"
-}
-```
-
-**Respuesta `201`:**
-
-```json
-{
-  "token": "eyJhbG...",
-  "user": { "id": "uuid", "email": "maria@example.com", "name": "María" }
-}
-```
-
-**Errores:** `400` validación, `409` email duplicado
+Detalle y ejemplos JSON: [`../docs/api-notes.md`](../docs/api-notes.md)
 
 ---
 
-### `POST /api/auth/login`
-
-**Auth:** no
-
-**Body:**
-
-```json
-{
-  "email": "maria@example.com",
-  "password": "secret12"
-}
-```
-
-**Respuesta `200`:**
-
-```json
-{
-  "token": "eyJhbG...",
-  "user": { "id": "uuid", "email": "maria@example.com", "name": "María" }
-}
-```
-
-**Errores:** `400` validación, `401` credenciales incorrectas
-
----
-
-### `GET /api/notes`
-
-**Auth:** sí
-
-**Respuesta `200`:** array de notas del usuario (sin expandir tags/items en listado)
-
----
-
-### `POST /api/notes`
-
-**Auth:** sí
-
-**Body:**
-
-```json
-{
-  "title": "Mi nota",
-  "type": "note",
-  "content": "Texto opcional",
-  "color": "#6366F1",
-  "tags": ["backend"],
-  "items": [{ "task": "Tarea", "is_completed": false }]
-}
-```
-
-`type`: `"note"` | `"checklist"` | `"idea"`
-
-**Respuesta `201`:** nota creada con `tags` e `items` si aplica
-
----
-
-### `GET /api/notes/:id`
-
-**Auth:** sí
-
-**Respuesta `200`:** nota con `tags` e `items`
-
-**Errores:** `404` no encontrada o de otro usuario
-
----
-
-### `PATCH /api/notes/:id`
-
-**Auth:** sí
-
-**Body (parcial):**
-
-```json
-{
-  "title": "Nuevo título",
-  "is_favorite": true,
-  "tags": ["docs"],
-  "items": [{ "task": "Hecho", "is_completed": true }]
-}
-```
-
-**Respuesta `200`:** nota actualizada
-
----
-
-### `DELETE /api/notes/:id`
-
-**Auth:** sí
-
-**Respuesta `204`:** sin body (cascade borra tags e items)
-
----
-
-### `GET /api/notes/:id/checklist-items`
-
-**Auth:** sí
-
-**Respuesta `200`:** array de items
-
----
-
-### `POST /api/notes/:id/checklist-items`
-
-**Auth:** sí
-
-**Body:**
-
-```json
-{ "task": "Nueva tarea", "is_completed": false }
-```
-
-**Respuesta `201`:** item creado
-
----
-
-### `PATCH /api/checklist-items/:itemId`
-
-**Auth:** sí
-
-**Body:** vacío (toggle) o `{ "is_completed": true }`
-
-**Respuesta `200`:** item actualizado
-
----
-
-### `DELETE /api/checklist-items/:itemId`
-
-**Auth:** sí
-
-**Respuesta `204`:** sin body
-
----
-
-## Estructura del proyecto
+## Estructura
 
 ```
 noteflow-api/
-  app/api/          # Route Handlers
+  app/api/              # Route Handlers
   lib/
-    db.ts           # Conexión Neon
-    auth.ts         # JWT + bcrypt
-    require-auth.ts # Middleware de autenticación
-    notes.ts        # Lógica de notas
-  requests/         # Colección HTTP (IDE)
+    db.ts               # Neon (sql.query)
+    load-env.ts         # Carga .env.local monorepo
+    auth.ts             # JWT + bcrypt
+    s3.ts               # S3 put/get/presign
+    media-url.ts        # buildPublicMediaUrl()
+    require-auth.ts     # JWT / Firebase
+    notes.ts            # Lógica de notas
+  requests/             # Colección HTTP (IDE)
 ```
+
+---
 
 ## Scripts
 
 | Comando | Descripción |
 |---------|-------------|
-| `npm run dev` | Servidor de desarrollo |
-| `npm run build` | Build de producción |
-| `npm run start` | Servidor de producción |
+| `npm run dev` | Desarrollo (puerto 3000) |
+| `npm run build` | Build producción |
+| `npm run start` | Servidor producción |
 
-## Documentación relacionada
+Desde la raíz: `npm run api` equivale a `npm run dev --prefix noteflow-api`.
 
-- `../docs/backend-teoria.md` — arquitectura, REST, SQL, JOINs
-- `../docs/seguridad-api.md` — SQL injection, env vars, JWT
-- `../docs/api-notes.md` — respuestas reales capturadas en pruebas
+---
+
+## Documentación
+
+- [`../docs/configuracion-aws-s3.md`](../docs/configuracion-aws-s3.md)
+- [`../docs/flujo-subida-imagenes-s3.md`](../docs/flujo-subida-imagenes-s3.md)
+- [`../docs/seguridad-api.md`](../docs/seguridad-api.md)
+- [`../docs/backend-teoria.md`](../docs/backend-teoria.md)

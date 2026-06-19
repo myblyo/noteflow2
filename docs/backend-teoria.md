@@ -9,36 +9,37 @@ Este documento resume los conceptos que sustentan el backend de Noteflow y cualq
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        CLIENTE (Expo)                           │
-│  React Native · Zustand · expo-secure-store (token JWT)         │
+│  React Native · Zustand · Secure Store / sessionStorage         │
 └────────────────────────────┬────────────────────────────────────┘
                              │ HTTPS + JSON
                              │ Authorization: Bearer <token>
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   API (Next.js · noteflow-api/)                   │
-│  Route Handlers · Zod · JWT · consultas parametrizadas            │
-│  Despliegue: Vercel                                               │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ SQL (Neon serverless driver)
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   DATOS (Neon · PostgreSQL)                     │
-│  users · notes · note_tags · checklist_items                      │
-└─────────────────────────────────────────────────────────────────┘
+│  JWT / Firebase · Zod · sql.query() · /api/media (proxy)        │
+│  Despliegue: Vercel (proyecto separado del frontend)            │
+└───────────────┬─────────────────────────────┬───────────────────┘
+                │ SQL                         │ S3 API (Put/Get)
+                ▼                             ▼
+┌───────────────────────────┐   ┌───────────────────────────────┐
+│  Neon · PostgreSQL          │   │  AWS S3 (o disco local dev)   │
+│  users · notes · tags · …   │   │  avatars/ · notes/            │
+└───────────────────────────┘   └───────────────────────────────┘
 ```
 
 | Capa | Tecnología | Responsabilidad |
 |------|------------|-----------------|
-| Cliente | Expo Router, `lib/api.ts` | UI, estado local, token en Secure Store |
-| API | Next.js 16 App Router | REST, validación, auth, lógica de negocio |
-| Datos | Neon PostgreSQL | Persistencia relacional, JOINs, CASCADE |
+| Cliente | Expo Router, `lib/api.ts`, `lib/mediaUrl.ts` | UI, token, URLs de imagen |
+| API | Next.js App Router | REST, auth, subida, proxy `/api/media` |
+| Datos | Neon PostgreSQL | Usuarios, notas, adjuntos (URLs) |
+| Archivos | AWS S3 | Bytes de imágenes (bucket puede ser privado) |
 
-Flujo con autenticación:
+Flujo con autenticación (web):
 
-1. `POST /api/auth/login` → el servidor devuelve un JWT.
-2. La app guarda el token en **expo-secure-store** (Keychain / Keystore).
-3. Cada petición a `/api/notes` lleva `Authorization: Bearer <token>`.
-4. El servidor verifica el JWT, obtiene `user_id` y filtra las notas del usuario.
+1. `POST /api/auth/login` → JWT + `{ user: { bio, avatarUrl, ... } }`.
+2. Token en **expo-secure-store** (móvil) o almacenamiento web.
+3. Peticiones a `/api/notes`, `/api/auth/me`, `/api/uploads/direct` con `Authorization: Bearer`.
+4. Imágenes: subida → URL `/api/media/...` → proxy S3 en el servidor.
 
 ---
 

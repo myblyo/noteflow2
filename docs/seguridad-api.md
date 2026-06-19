@@ -62,7 +62,7 @@ Aunque `req.body.title` sea `'; DROP TABLE notes;--`, PostgreSQL lo compara como
 
 ### Cómo lo hace Noteflow
 
-El módulo `server/src/lib/db.ts` (y `lib/db.ts` en la raíz) centraliza el acceso a Neon:
+El módulo `noteflow-api/lib/db.ts` centraliza el acceso a Neon:
 
 ```typescript
 import { neon } from "@neondatabase/serverless";
@@ -144,7 +144,7 @@ El **connection string es equivalente a la llave de la base de datos**. Quien lo
    DATABASE_URL=
    ```
 
-3. **Carga en el servidor:** `server/src/loadEnv.ts` lee `.env.local` antes de arrancar la API.
+3. **Carga en el servidor:** `noteflow-api/lib/load-env.ts` y `next.config.ts` leen `.env.local` de la raíz del monorepo antes de arrancar.
 
 4. **Uso en código:** solo la referencia al nombre de la variable:
 
@@ -195,8 +195,10 @@ En web, el fallback usa `sessionStorage` (solo desarrollo).
 
 | Variable | Dónde | Nunca en |
 |----------|-------|----------|
-| `JWT_SECRET` | Servidor / Vercel | Cliente Expo, Git |
-| `DATABASE_URL` | Servidor / Vercel | Cliente Expo, Git |
+| `JWT_SECRET` | Servidor / Vercel (proyecto API) | Cliente Expo, Git |
+| `DATABASE_URL` | Servidor / Vercel (proyecto API) | Cliente Expo, Git |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Servidor / Vercel (proyecto API) | Cliente Expo, Git |
+| `EXPO_PUBLIC_API_URL` | App web / móvil (proyecto web Vercel) | No es secreto; apunta a la API |
 
 ---
 

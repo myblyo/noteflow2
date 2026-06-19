@@ -2,44 +2,49 @@
 
 Guía para conectar Noteflow con [Neon](https://neon.tech) (PostgreSQL serverless).
 
+La API principal está en **`noteflow-api/`** (Next.js, puerto 3000). La carpeta **`server/`** contiene scripts de migración y prueba de conexión.
+
 ---
 
 ## 1. Crear proyecto en Neon
 
-1. Entra en [console.neon.tech](https://console.neon.tech).
-2. Crea un proyecto (por ejemplo `noteflow`).
-3. Copia la **connection string** (usa el **pooler** para serverless).
+1. [console.neon.tech](https://console.neon.tech)
+2. Crea un proyecto (p. ej. `noteflow`)
+3. **Connect** → copia la connection string del **pooler** (termina en `-pooler...`)
+
+Ejemplo:
+
+```text
+postgresql://neondb_owner:****@ep-xxxx-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+```
 
 ---
 
-## 2. Configurar variables de entorno
+## 2. Configurar `.env.local`
 
-En la raíz del repo, crea `.env.local` (ya está en `.gitignore`):
-
-```env
-DATABASE_URL=postgresql://USER:PASSWORD@HOST/neondb?sslmode=require
-```
-
-Plantilla sin secretos: `.env.example`
+En la **raíz del repo** (no en `.env.example`):
 
 ```env
-DATABASE_URL=
+DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxx-pooler.region.aws.neon.tech/neondb?sslmode=require
 ```
 
-Nunca subas `.env.local` ni pegues la connection string en el código.
+> Usa la URL **real** de Neon. El placeholder `@HOST` de la documentación provoca `ENOTFOUND host`.
+
+La API carga este archivo desde `noteflow-api/lib/load-env.ts` y `noteflow-api/next.config.ts`.
 
 ---
 
 ## 3. Probar la conexión
 
+Desde la raíz del monorepo:
+
 ```bash
-cd server
 npm run db:test
 ```
 
 Salida esperada:
 
-```
+```text
 Neon connected successfully
 PostgreSQL 16.x ...
 ```
@@ -49,35 +54,32 @@ PostgreSQL 16.x ...
 ## 4. Crear tablas
 
 ```bash
-cd server
 npm run db:migrate
 ```
 
-Crea en Neon:
+Aplica `server/sql/schema.sql` en Neon:
 
-- `notes`
-- `ideas`
-- `checklists`
+- `users` (con `name`, `bio`, `avatar_url`, `firebase_uid`)
+- `notes`, `note_tags`, `checklist_items`, `note_attachments`, …
 
-El SQL está en `server/sql/schema.sql`.
+La API también aplica parches incrementales al arrancar (`noteflow-api/lib/db.ts`).
 
 ---
 
 ## 5. Arrancar la API
 
 ```bash
-cd server
-npm run dev
+npm run api
 ```
 
 | URL | Descripción |
 |-----|-------------|
-| `http://localhost:3001/` | Info de la API |
-| `http://localhost:3001/api/health` | Estado + `database: connected` |
+| `http://localhost:3000/api` | Info del servicio |
+| `http://localhost:3000/api/health` | `{"ok":true,"db":true}` |
 
 ---
 
-## Módulo `lib/db.ts`
+## Módulo `noteflow-api/lib/db.ts`
 
 ```typescript
 import { neon } from "@neondatabase/serverless";
@@ -85,15 +87,31 @@ import { neon } from "@neondatabase/serverless";
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
-  const result = params ? await sql.query(text, params) : await sql.query(text);
+  const result = params
+    ? await sql.query(text, params)
+    : await sql.query(text);
   return result as T[];
 }
 ```
 
-Usa `sql.query()` para consultas con `$1`, `$2`, etc. No llames `sql("SELECT...")` directamente (Neon 1.x lo bloquea por seguridad).
+**Importante (Neon 1.x):** usa `sql.query(text, params)`. No llames `sql("SELECT...")` directamente.
+
+---
+
+## Vercel
+
+En el proyecto **API** (Root Directory `noteflow-api`):
+
+```env
+DATABASE_URL=postgresql://...@ep-xxxx-pooler.../neondb?sslmode=require
+```
+
+Usa siempre el endpoint **pooler** para serverless.
 
 ---
 
 ## Siguiente paso
 
-La API sigue usando `server/data/db.json` como almacén temporal. El siguiente paso es migrar las rutas (`/api/notes`, etc.) para leer y escribir en Neon con `query()`.
+- Registrar usuario: `POST /api/auth/register`
+- Documentación API: [`noteflow-api/README.md`](../noteflow-api/README.md)
+- Seguridad: [`seguridad-api.md`](./seguridad-api.md)

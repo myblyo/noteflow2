@@ -1,8 +1,14 @@
 # API de notas (`/api/notes`)
 
-Backend **Next.js** en `noteflow-api/`. Base URL local: `http://localhost:3000/api/notes`.
+Backend **Next.js** en `noteflow-api/`. Base URL local: `http://localhost:3000/api`.
 
-Las etiquetas (`note_tags`) y tareas (`checklist_items`) están vinculadas a `notes` con `ON DELETE CASCADE`: al borrar una nota, PostgreSQL elimina automáticamente sus tags e items.
+**Autenticación obligatoria** en todas las rutas de notas:
+
+```http
+Authorization: Bearer <JWT o Firebase ID Token>
+```
+
+Las etiquetas (`note_tags`) y tareas (`checklist_items`) están vinculadas a `notes` con `ON DELETE CASCADE`.
 
 Colección de peticiones para el cliente HTTP del IDE: `noteflow-api/requests/notes.http`.
 

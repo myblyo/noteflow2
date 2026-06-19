@@ -1,6 +1,8 @@
 # Configuración de AWS S3 en NoteFlow
 
-NoteFlow sube imágenes (avatar y adjuntos de notas) a **Amazon S3** usando **Presigned URLs**. Las credenciales de AWS **solo** viven en el servidor (`noteflow-api`); la app móvil nunca las ve.
+NoteFlow sube imágenes (avatar de perfil y adjuntos de notas) a **Amazon S3**. Las credenciales AWS **solo** viven en el servidor (`noteflow-api`); la app nunca las ve.
+
+Las imágenes se **muestran** a través del proxy de la API (`GET /api/media/...`), así que **no hace falta** hacer el bucket público.
 
 ---
 
@@ -8,9 +10,11 @@ NoteFlow sube imágenes (avatar y adjuntos de notas) a **Amazon S3** usando **Pr
 
 ```
 App autenticada
-    → POST /api/uploads/direct (web) o /api/uploads/presign (móvil)
-    → S3 (desde la API en web, evita CORS)
-    → Guarda publicUrl en Firestore (avatar) o PostgreSQL (adjuntos)
+    → Web:     POST /api/uploads/direct  (subida server-side, sin CORS)
+    → Móvil:   POST /api/uploads/presign → PUT a S3
+    → API devuelve publicUrl = https://TU-API/api/media/avatars/...
+    → Perfil:  PATCH /api/auth/me { bio, avatarUrl }
+    → Pantalla: GET /api/media/avatars/... (proxy S3 o disco local)
 ```
 
 Diagrama completo: [`flujo-subida-imagenes-s3.md`](./flujo-subida-imagenes-s3.md)
@@ -19,71 +23,17 @@ Diagrama completo: [`flujo-subida-imagenes-s3.md`](./flujo-subida-imagenes-s3.md
 
 ## Paso 1 — Crear bucket S3
 
-1. Entra en [AWS Console → S3](https://s3.console.aws.amazon.com/s3/).
-2. **Create bucket**
-3. Nombre único, por ejemplo: `noteflow2-images`
-4. Región: anótala (ej. `eu-west-1`)
-5. Para URLs públicas directas, desactiva **Block all public access** (solo si aceptas lectura pública de imágenes).
+1. [AWS Console → S3](https://s3.console.aws.amazon.com/s3/)
+2. **Create bucket** → nombre único, p. ej. `noteflow2-images`
+3. Anota la **región** (p. ej. `eu-north-1`)
+4. Puedes dejar **Block all public access** activado (el bucket puede ser privado)
 
 ---
 
-## Paso 2 — Política de lectura pública (bucket)
-
-**Permissions → Bucket policy** (sustituye el nombre del bucket):
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadGetObject",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::noteflow2-images/*"
-    }
-  ]
-}
-```
-
-Así las imágenes se ven con URLs como:
-
-`https://noteflow2-images.s3.eu-west-1.amazonaws.com/avatars/...`
-
----
-
-## Paso 2b — CORS del bucket (obligatorio para web / Vercel)
-
-Desde el **navegador**, la app hace `PUT` directo a S3. Sin CORS el navegador bloquea la petición con **"Failed to fetch"**.
-
-1. Bucket → **Permissions** → **Cross-origin resource sharing (CORS)**
-2. **Edit** → pega esto (sustituye tu dominio de Vercel):
-
-```json
-[
-  {
-    "AllowedHeaders": ["*"],
-    "AllowedMethods": ["GET", "PUT", "HEAD"],
-    "AllowedOrigins": [
-      "https://TU-FRONT.vercel.app",
-      "http://localhost:8081",
-      "http://localhost:19006"
-    ],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 3000
-  }
-]
-```
-
-> Sustituye `https://TU-FRONT.vercel.app` por la URL exacta de tu frontend (copia la de la barra del navegador).  
-> Para probar rápido puedes usar `"*"` en `AllowedOrigins` (menos restrictivo).
-
----
-
-## Paso 3 — Usuario IAM para la API
+## Paso 2 — Usuario IAM para la API
 
 1. [IAM → Users → Create user](https://console.aws.amazon.com/iam/) → `noteflow-api`
-2. Crea una policy inline:
+2. Policy inline (sustituye el nombre del bucket):
 
 ```json
 {
@@ -91,57 +41,73 @@ Desde el **navegador**, la app hace `PUT` directo a S3. Sin CORS el navegador bl
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:PutObject"],
+      "Action": ["s3:PutObject", "s3:GetObject"],
       "Resource": "arn:aws:s3:::noteflow2-images/*"
     }
   ]
 }
 ```
 
-3. **Security credentials → Create access key** (Application running outside AWS).
-4. Guarda **Access Key ID** y **Secret Access Key**.
+- `s3:PutObject` — subir imágenes
+- `s3:GetObject` — servir imágenes vía `/api/media` (proxy)
+
+3. **Security credentials → Create access key** → guarda Access Key ID y Secret
 
 ---
 
-## Paso 4 — Variables de entorno
+## Paso 3 — Variables de entorno
 
-### Local (`.env.local` en la raíz o `noteflow-api/.env.local`)
+### Local (`.env.local` en la raíz del repo)
 
 ```env
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=eu-west-1
+AWS_REGION=eu-north-1
 AWS_S3_BUCKET=noteflow2-images
-AWS_S3_PUBLIC_URL=https://noteflow2-images.s3.eu-west-1.amazonaws.com
+AWS_S3_PUBLIC_URL=https://noteflow2-images.s3.eu-north-1.amazonaws.com
 ```
+
+La API carga `.env.local` desde la raíz (`noteflow-api/lib/load-env.ts` y `next.config.ts`).
 
 ### Vercel (proyecto API, Root Directory = `noteflow-api`)
 
 | Variable | Valor |
 |----------|--------|
-| `AWS_ACCESS_KEY_ID` | tu access key |
-| `AWS_SECRET_ACCESS_KEY` | tu secret |
-| `AWS_REGION` | `eu-west-1` |
-| `AWS_S3_BUCKET` | `noteflow2-images` |
-| `AWS_S3_PUBLIC_URL` | URL base pública del bucket |
+| `AWS_ACCESS_KEY_ID` | Access key IAM |
+| `AWS_SECRET_ACCESS_KEY` | Secret IAM |
+| `AWS_REGION` | Región del bucket |
+| `AWS_S3_BUCKET` | Nombre del bucket |
+| `AWS_S3_PUBLIC_URL` | Opcional; URL base del bucket |
 
-**Redeploy** del proyecto API tras añadir las variables.
+**Redeploy** tras añadir o cambiar variables.
 
 ---
 
-## Paso 5 — Probar la conexión
+## Paso 4 — Probar
 
-1. Arranca la API: `npm run api`
-2. Inicia sesión en la app.
-3. **Perfil → Cambiar foto de perfil** (se guarda automáticamente al subir)
-4. En DevTools → **Network**:
-   - Web/Vercel: `POST .../api/uploads/direct` → 200
-   - Móvil: `POST .../api/uploads/presign` → 200 y `PUT` a S3 → 200
-   - Mostrar imagen: `GET .../api/media/avatars/...` → 200
+1. `npm run api` + `npm start`
+2. Inicia sesión → **Perfil**
+3. Cambiar foto de perfil → **Guardar cambios**
+4. DevTools → Network:
 
-### Sin AWS (solo desarrollo)
+| Petición | Esperado |
+|----------|----------|
+| `POST /api/uploads/direct` | 200 (web) |
+| `PATCH /api/auth/me` | 200 con `avatarUrl` |
+| `GET /api/media/avatars/...` | 200 (imagen visible) |
 
-Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local automáticamente (`/api/uploads/local`). Las imágenes se guardan en `noteflow-api/public/uploads/` y se sirven vía `/api/media/...`.
+Tras cerrar sesión y volver a entrar, la foto debe persistir.
+
+---
+
+## Sin AWS (solo desarrollo local)
+
+Si **no** configuras `AWS_*`, la API guarda en disco:
+
+- Ruta: `noteflow-api/public/uploads/`
+- URL pública: `/api/media/avatars/...`
+
+En **Vercel** sin AWS la subida devuelve error 503 (configura las variables en el proyecto API).
 
 ---
 
@@ -149,13 +115,16 @@ Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local auto
 
 | Archivo | Función |
 |---------|---------|
-| `noteflow-api/lib/s3.ts` | Cliente S3 + Presigned URL |
-| `noteflow-api/app/api/uploads/direct/route.ts` | Subida server-side (web/Vercel) |
-| `noteflow-api/app/api/media/[...path]/route.ts` | Proxy de imágenes S3 (bucket privado) |
-| `lib/s3Upload.ts` | App: subida directa (web) o presign + PUT (móvil) |
-| `lib/mediaUrl.ts` | Convierte URLs S3 → `/api/media/...` para mostrar |
-| `lib/uploadToAWS.ts` | Avatar + Firestore (móvil) |
-| `components/RemoteImage.tsx` | Muestra imágenes vía proxy de la API |
+| `noteflow-api/lib/s3.ts` | Cliente S3, presign, getObject |
+| `noteflow-api/lib/media-url.ts` | Construye URL `/api/media/...` |
+| `noteflow-api/app/api/uploads/direct/route.ts` | Subida server-side (web) |
+| `noteflow-api/app/api/uploads/presign/route.ts` | Presign (móvil) |
+| `noteflow-api/app/api/media/[...path]/route.ts` | Proxy de imágenes |
+| `lib/s3Upload.ts` | Cliente: direct (web) o presign+PUT (móvil) |
+| `lib/mediaUrl.ts` | Normaliza URLs para mostrar en la app |
+| `components/RemoteImage.tsx` | Componente de imagen remota |
+| `components/ProfileNavButton.tsx` | Avatar en barra lateral |
+| `app/perfil.tsx` | Pantalla de perfil |
 
 ---
 
@@ -163,18 +132,19 @@ Si **no** configuras las variables `AWS_*`, la API usa almacenamiento local auto
 
 | Síntoma | Solución |
 |---------|----------|
-| **Failed to fetch** al subir (web/Vercel) | Configura **CORS** en el bucket S3 (Paso 2b) |
-| Error interno en presign | Faltan variables AWS en el proyecto **API** |
-| PUT a S3 → 403 | IAM sin permiso `s3:PutObject` o región incorrecta (`AWS_REGION`) |
-| Imagen no se ve | No hace falta bucket público: la app usa `/api/media/...`. Comprueba credenciales AWS en el proyecto API |
-| Foto de perfil desaparece al guardar | La foto se guarda al subir; "Guardar cambios" es solo para la bio |
-| Funciona local, no en Vercel | Variables solo en `.env.local`, no en Vercel |
+| Error 503 al subir en Vercel | Añade `AWS_*` en el proyecto **API**, no en el web |
+| Imagen no se ve (icono roto) | Comprueba `GET /api/media/...` → 200; IAM necesita `s3:GetObject` |
+| Error interno al login | Revisa `DATABASE_URL` real de Neon (no placeholder `@HOST`) |
+| Error 405 en la app web | `EXPO_PUBLIC_API_URL` debe apuntar a la **API**, no al frontend |
+| Foto no persiste tras logout | Pulsa **Guardar cambios** después de elegir la foto |
+| Spinner infinito en avatar lateral | Actualizado: `ProfileNavButton` desactiva loader en avatares pequeños |
 
 ---
 
 ## Seguridad
 
-- Las claves AWS **nunca** van en la app Expo.
-- Cada Presigned URL expira en **5 minutos**.
-- Las rutas en S3 incluyen el `userId`: `avatars/{userId}/...`, `notes/{userId}/...`.
-- El presign exige usuario autenticado (`Authorization: Bearer`).
+- Claves AWS **nunca** en la app Expo ni en Git.
+- Presigned URLs expiran en **5 minutos** (móvil).
+- Rutas S3 incluyen `userId`: `avatars/{userId}/...`, `notes/{userId}/...`.
+- Subida y presign exigen `Authorization: Bearer`.
+- `/api/media` solo sirve claves con formato `avatars/...` o `notes/...` (validación en servidor).

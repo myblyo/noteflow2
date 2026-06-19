@@ -4,11 +4,11 @@ App de notas, ideas y checklists multiplataforma (iOS, Android y web) con backen
 
 ## Características
 
-- **Notas** — texto libre con favoritos y búsqueda
+- **Notas** — texto libre con favoritos, búsqueda e imágenes embebidas
 - **Ideas** — tarjetas con color, etiquetas y descripción
 - **Checklists** — items con progreso y estado completado
-- **Autenticación** — JWT vía API y Firebase Auth
-- **Perfil** — avatar e imagen de perfil (S3 en producción)
+- **Autenticación** — JWT en web; Firebase Auth en móvil nativo
+- **Perfil** — biografía y foto de perfil (S3 o almacenamiento local)
 - **Tema** — claro / oscuro
 - **Responsive** — layout adaptado a móvil y escritorio
 
@@ -16,11 +16,12 @@ App de notas, ideas y checklists multiplataforma (iOS, Android y web) con backen
 
 | Capa | Tecnología |
 |------|------------|
-| App | Expo 56, React Native 0.85, expo-router, Zustand |
+| App | Expo 56, React Native, expo-router, Zustand |
 | API | Next.js App Router (`noteflow-api/`) |
 | Base de datos | Neon PostgreSQL |
-| Auth | JWT + Firebase (`@react-native-firebase`) |
-| Almacenamiento | AWS S3 (adjuntos e imágenes) |
+| Auth web | JWT + bcrypt |
+| Auth móvil | Firebase Auth + Firestore (perfil) |
+| Imágenes | AWS S3 + proxy `/api/media` (bucket puede ser privado) |
 
 ## Estructura del repositorio
 
@@ -28,10 +29,10 @@ App de notas, ideas y checklists multiplataforma (iOS, Android y web) con backen
 noteflow2/
 ├── app/                 # Pantallas (expo-router)
 ├── components/          # UI reutilizable
-├── lib/                 # Cliente API, auth, Firebase, uploads
+├── lib/                 # Cliente API, auth, uploads, mediaUrl
 ├── store/               # Estado global (Zustand)
 ├── noteflow-api/        # Backend Next.js (puerto 3000)
-├── server/              # Scripts SQL y migraciones
+├── server/              # Scripts SQL y migraciones (Neon)
 ├── docs/                # Documentación técnica
 ├── google-services.json # Firebase Android
 └── GoogleService-Info.plist  # Firebase iOS
@@ -41,9 +42,9 @@ noteflow2/
 
 - Node.js 20+
 - Cuenta en [Neon](https://neon.tech)
-- Proyecto en [Firebase Console](https://console.firebase.google.com)
-- Para build nativo Android: Android Studio, SDK, emulador o dispositivo físico
-- (Opcional) Cuenta AWS S3 para subida de imágenes en producción
+- Proyecto en [Firebase Console](https://console.firebase.google.com) (solo móvil nativo)
+- Cuenta AWS S3 para imágenes en producción (Vercel)
+- Android Studio / emulador (opcional, build nativo)
 
 ## Instalación
 
@@ -51,152 +52,151 @@ noteflow2/
 git clone <repo-url> noteflow2
 cd noteflow2
 npm install
-npm install --prefix noteflow-api
 ```
+
+(`postinstall` instala también las dependencias de `noteflow-api`.)
 
 ### Variables de entorno
 
-Copia `.env.example` a `.env.local` en la raíz:
+Copia `.env.example` → `.env.local` en la **raíz del repo**:
 
 ```env
-DATABASE_URL=postgresql://USER:PASSWORD@HOST/neondb?sslmode=require
-JWT_SECRET=una-clave-larga-y-aleatoria
-EXPO_PUBLIC_API_URL=http://10.0.2.2:3000/api
+DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+EXPO_PUBLIC_API_URL=http://localhost:3000/api
+JWT_SECRET=                          # opcional en local; recomendado en Vercel
+AWS_ACCESS_KEY_ID=                   # imágenes (proyecto API)
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=eu-north-1
+AWS_S3_BUCKET=noteflow2-images
+FIREBASE_PROJECT_ID=noteflow2-18554  # móvil nativo
 ```
 
-| Variable | Uso |
-|----------|-----|
-| `DATABASE_URL` | Conexión Neon (solo servidor) |
-| `JWT_SECRET` | Firma de tokens JWT (solo servidor) |
-| `EXPO_PUBLIC_API_URL` | URL base de la API para la app |
+| Variable | Dónde se usa | Obligatoria |
+|----------|--------------|-------------|
+| `DATABASE_URL` | API (`noteflow-api`) | Sí |
+| `EXPO_PUBLIC_API_URL` | App Expo | Sí |
+| `JWT_SECRET` | API | Local: no / Vercel: sí |
+| `AWS_*` | API (subida y visualización de imágenes) | Vercel: sí |
+| `FIREBASE_PROJECT_ID` | API móvil (verificar tokens) | Móvil |
 
-Para S3 y Firebase Admin en la API, añade también las variables descritas en `.env.example` y en [`noteflow-api/README.md`](noteflow-api/README.md).
+> Los secretos van **solo** en `.env.local` (gitignored). Nunca en `.env.example` ni en el repositorio.
 
 ### Base de datos
 
 ```bash
-npm run db:migrate
-npm run db:test   # opcional: verificar conexión
+npm run db:migrate   # crea tablas en Neon
+npm run db:test      # prueba la conexión
 ```
 
-### Firebase
+Guía: [`docs/getting-started-neon.md`](docs/getting-started-neon.md)
 
-Los archivos `google-services.json` y `GoogleService-Info.plist` deben estar en la raíz del proyecto. El plugin ya está configurado en `app.json`:
+### Firebase (móvil nativo)
 
-```json
-"plugins": ["expo-router", "@react-native-firebase/app", "@react-native-firebase/auth"]
-```
+Archivos en la raíz: `google-services.json`, `GoogleService-Info.plist`.
 
-El `android.package` e `ios.bundleIdentifier` deben coincidir con los registrados en Firebase (`com.myblyo.noteflow2`).
+Guía: [`docs/autenticacion-movil-firebase.md`](docs/autenticacion-movil-firebase.md)
 
 ## Desarrollo
 
-Abre **dos terminales** en la raíz del proyecto.
-
-**Terminal 1 — API**
+Abre **dos terminales** en la raíz:
 
 ```bash
+# Terminal 1 — API
 npm run api
-```
 
-La API queda en `http://localhost:3000/api`.
-
-**Terminal 2 — App**
-
-```bash
+# Terminal 2 — App
 npm start
 ```
 
-- **Web:** pulsa `w` o abre el enlace en el navegador
-- **Expo Go / dev client:** escanea el QR
-- **Emulador Android:** pulsa `a` (con emulador encendido)
-
-### URL de la API según plataforma
-
-| Plataforma | URL por defecto |
-|------------|-----------------|
-| Web | `http://localhost:3000/api` |
+| Plataforma | URL de la API |
+|------------|---------------|
+| Web (navegador) | `http://localhost:3000/api` |
 | Emulador Android | `http://10.0.2.2:3000/api` |
-| Móvil físico (misma WiFi) | IP del PC detectada automáticamente vía Metro |
+| Móvil físico (WiFi) | IP del PC detectada vía Metro |
 
-Puedes forzar la URL con `EXPO_PUBLIC_API_URL` en `.env.local`.
+Configura `EXPO_PUBLIC_API_URL` en `.env.local` si hace falta forzar la URL.
 
-## Build nativo
+Comprueba la API: `http://localhost:3000/api/health` → `{"ok":true,"db":true}`
 
-Requiere prebuild (genera carpetas `android/` e `ios/`):
+## Perfil e imágenes
 
-```bash
-npx expo prebuild
-npx expo run:android
-npx expo run:ios
-```
+1. **Perfil** → Cambiar foto de perfil (sube a S3 o almacenamiento local)
+2. Editar biografía
+3. **Guardar cambios** → persiste `bio` y `avatarUrl` en PostgreSQL (web)
+4. La foto se muestra vía `/api/media/avatars/...` (no hace falta bucket S3 público)
 
-En Windows, si Gradle falla por rutas largas:
-
-```powershell
-npm run android:setup-win   # copia el proyecto a C:\nf\noteflow2
-npm run android:win         # build desde la ruta corta
-```
-
-Asegúrate de tener `ANDROID_HOME` en el PATH y un emulador o dispositivo conectado (`adb devices`).
+Guías: [`docs/configuracion-aws-s3.md`](docs/configuracion-aws-s3.md), [`docs/flujo-subida-imagenes-s3.md`](docs/flujo-subida-imagenes-s3.md)
 
 ## Scripts disponibles
 
 | Comando | Descripción |
 |---------|-------------|
 | `npm start` | Metro / Expo dev server |
-| `npm run android` | Build e instala en Android |
-| `npm run ios` | Build e instala en iOS |
 | `npm run web` | App en navegador |
 | `npm run api` | API Next.js en desarrollo |
-| `npm run db:migrate` | Aplica el esquema SQL en Neon |
-| `npm run db:test` | Prueba la conexión a la base de datos |
+| `npm run build:web` | Export estático para Vercel (web) |
+| `npm run db:migrate` | Aplica esquema SQL en Neon |
+| `npm run db:test` | Prueba conexión a Neon |
+| `npm run android` | Build e instala en Android |
 
 ## Documentación
 
-- [`docs/autenticacion-movil-firebase.md`](docs/autenticacion-movil-firebase.md) — Firebase Auth, Firestore, notas por usuario
-- [`docs/configuracion-aws-s3.md`](docs/configuracion-aws-s3.md) — conectar AWS S3 (bucket, IAM, variables)
-- [`docs/flujo-subida-imagenes-s3.md`](docs/flujo-subida-imagenes-s3.md) — diagrama subida de imágenes
-- [`noteflow-api/README.md`](noteflow-api/README.md) — endpoints REST, deploy en Vercel
-- [`docs/backend-teoria.md`](docs/backend-teoria.md) — arquitectura y modelo de datos
-- [`docs/seguridad-api.md`](docs/seguridad-api.md) — JWT, SQL injection, variables de entorno
-- [`docs/api-notes.md`](docs/api-notes.md) — ejemplos de respuestas de la API
+Índice completo: [`docs/README.md`](docs/README.md)
 
-## Despliegue
+- [`docs/autenticacion-movil-firebase.md`](docs/autenticacion-movil-firebase.md)
+- [`docs/configuracion-aws-s3.md`](docs/configuracion-aws-s3.md)
+- [`docs/flujo-subida-imagenes-s3.md`](docs/flujo-subida-imagenes-s3.md)
+- [`noteflow-api/README.md`](noteflow-api/README.md)
+- [`docs/backend-teoria.md`](docs/backend-teoria.md)
+- [`docs/seguridad-api.md`](docs/seguridad-api.md)
+- [`docs/api-notes.md`](docs/api-notes.md)
+- [`docs/getting-started-neon.md`](docs/getting-started-neon.md)
 
-Necesitas **dos proyectos en Vercel** (o uno para la API y otro para la web):
+## Despliegue en Vercel
+
+Necesitas **dos proyectos** con el mismo repositorio.
 
 ### 1. API (backend)
 
-1. Importa el repo en [vercel.com/new](https://vercel.com/new).
-2. **Root Directory:** `noteflow-api`
-3. Variables: `DATABASE_URL`, `JWT_SECRET` (+ S3/Firebase si aplica).
-4. Deploy.
+| Campo | Valor |
+|-------|--------|
+| Root Directory | `noteflow-api` |
+| Framework | Next.js |
+
+**Variables de entorno:**
+
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Connection string Neon (pooler) |
+| `JWT_SECRET` | Clave aleatoria (32+ bytes) |
+| `AWS_ACCESS_KEY_ID` | IAM con `s3:PutObject` + `s3:GetObject` |
+| `AWS_SECRET_ACCESS_KEY` | Secret IAM |
+| `AWS_REGION` | Región del bucket |
+| `AWS_S3_BUCKET` | Nombre del bucket |
+
+Verifica: `https://TU-API.vercel.app/api/health` → `{"ok":true,"db":true}`
 
 ### 2. App web (frontend Expo)
 
-1. Crea **otro** proyecto en Vercel con el **mismo repo** (no reutilices el de la API).
-2. Configuración:
-
 | Campo | Valor |
-|--------|--------|
-| **Root Directory** | *(vacío — raíz del repo)* |
-| **Framework Preset** | Other |
-| **Build Command** | `npm run build:web` |
-| **Output Directory** | `dist` |
-| **Install Command** | `npm install` |
+|-------|--------|
+| Root Directory | *(vacío — raíz)* |
+| Build Command | `npm run build:web` |
+| Output Directory | `dist` |
 
-   Si no puedes editar los campos, Vercel leerá `vercel.json` de la raíz del repo (ya incluido).
+**Variable de entorno:**
 
-3. **Environment Variables:**
-   - `EXPO_PUBLIC_API_URL` = `https://TU-API.vercel.app/api`  
-     (la URL real de tu proyecto API, con `/api` al final)
+```env
+EXPO_PUBLIC_API_URL=https://TU-API.vercel.app/api
+```
 
-4. **Deploy** → abre la URL que te da Vercel → deberías ver login / Noteflow.
+(`vercel.json` en la raíz ya define build/output.)
 
-> El proyecto API usa Root Directory `noteflow-api` y **no** usa `dist`. El frontend usa la raíz y **sí** usa `dist`.
+> **Importante:** la web llama a la **API**, no a sí misma. Si ves error 405, revisa `EXPO_PUBLIC_API_URL`.
 
-- **App móvil (iOS/Android):** builds con [EAS Build](https://docs.expo.dev/build/introduction/) (`eas.json` incluido). En producción usa la misma `EXPO_PUBLIC_API_URL`.
+### App móvil (producción)
+
+Builds con [EAS Build](https://docs.expo.dev/build/introduction/). Usa la misma `EXPO_PUBLIC_API_URL` apuntando a la API en Vercel.
 
 ## Licencia
 

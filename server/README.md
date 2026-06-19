@@ -1,71 +1,66 @@
-# Noteflow API
+# Scripts SQL y migraciones (`server/`)
 
-REST API for the Noteflow app. Built with **Node.js**, **Express**, and **TypeScript**.
+Esta carpeta contiene **scripts de base de datos** para Neon PostgreSQL. **No** es la API en producción.
 
-## Quick start
+| Componente | Ubicación | Puerto |
+|----------|-----------|--------|
+| **API REST (producción)** | `noteflow-api/` | 3000 |
+| **Scripts SQL (este folder)** | `server/` | — |
+
+---
+
+## Comandos (desde la raíz del monorepo)
+
+```bash
+npm run db:migrate   # Aplica server/sql/schema.sql en Neon
+npm run db:test      # Prueba conexión (DATABASE_URL en .env.local)
+```
+
+Equivalente manual:
 
 ```bash
 cd server
-npm install
-cp .env.example .env
-npm run dev
+npm run db:migrate
+npm run db:test
 ```
 
-API base URL: `http://localhost:3001/api`
+---
 
-## Endpoints
+## Configuración
 
-### Health
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Service status |
+`DATABASE_URL` en `.env.local` de la **raíz del repo**.
 
-### All data
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api` | Notes, ideas, checklists, color labels |
+`server/src/loadEnv.ts` carga:
 
-### Notes
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/notes` | List notes |
-| GET | `/api/notes/:id` | Get one note |
-| POST | `/api/notes` | Create note |
-| PUT | `/api/notes/:id` | Update note |
-| PATCH | `/api/notes/:id/favorite` | Toggle favorite |
-| DELETE | `/api/notes/:id` | Delete note |
+1. `../../.env.local` (raíz)
+2. `../.env` (server)
 
-### Ideas
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/ideas` | List ideas |
-| GET | `/api/ideas/:id` | Get one idea |
-| POST | `/api/ideas` | Create idea |
-| PUT | `/api/ideas/:id` | Update idea |
-| PATCH | `/api/ideas/:id/favorite` | Toggle favorite |
-| DELETE | `/api/ideas/:id` | Delete idea |
+---
 
-### Checklists
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/checklists` | List checklists |
-| GET | `/api/checklists/:id` | Get one checklist |
-| POST | `/api/checklists` | Create checklist |
-| PUT | `/api/checklists/:id` | Update checklist |
-| PATCH | `/api/checklists/:id/favorite` | Toggle favorite |
-| PATCH | `/api/checklists/:id/items/:itemId/toggle` | Toggle task |
-| DELETE | `/api/checklists/:id` | Delete checklist |
+## Esquema
 
-## Example
+Archivo principal: `server/sql/schema.sql`
 
-```bash
-curl http://localhost:3001/api/health
-curl http://localhost:3001/api/notes
-curl -X POST http://localhost:3001/api/notes \
-  -H "Content-Type: application/json" \
-  -d '{"title":"My note","content":"Hello"}'
+Tablas principales:
+
+- `users` — email, password_hash, name, bio, avatar_url, firebase_uid
+- `notes` — notas, ideas, checklists unificadas (`type`)
+- `note_tags`, `checklist_items`, `note_attachments`
+
+---
+
+## Módulo de conexión
+
+`server/src/lib/db.ts` — mismo patrón que `noteflow-api/lib/db.ts`:
+
+```typescript
+await sql.query("SELECT * FROM users WHERE id = $1", [userId]);
 ```
 
-## Data storage
+---
 
-Data is persisted in `server/data/db.json`. A seed file is created on first run.
+## Nota histórica
+
+Existió un servidor Express en `server/` (`server/src/index.ts`, puerto 3001, `db.json`). La app actual usa **`noteflow-api`** (Next.js). Estos scripts se mantienen para migraciones y pruebas de Neon.
+
+Documentación API: [`noteflow-api/README.md`](../noteflow-api/README.md)
