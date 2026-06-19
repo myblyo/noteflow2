@@ -11,7 +11,13 @@ export function setAuthToken(token: string | null) {
 
 export type AuthResponse = {
   token: string;
-  user: { id: string; email: string; name: string; avatarUrl?: string | null };
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    bio?: string;
+    avatarUrl?: string | null;
+  };
 };
 
 export type ApiChecklistItem = {
@@ -193,10 +199,17 @@ export async function getMe(): Promise<AuthResponse["user"]> {
 }
 
 export async function updateAvatarUrl(avatarUrl: string): Promise<AuthResponse["user"]> {
+  return updateProfile({ avatarUrl });
+}
+
+export async function updateProfile(input: {
+  avatarUrl?: string;
+  bio?: string;
+}): Promise<AuthResponse["user"]> {
   const data = await apiFetch<{ user: AuthResponse["user"] }>("/auth/me", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ avatarUrl }),
+    body: JSON.stringify(input),
   });
   return data.user;
 }

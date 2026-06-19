@@ -5,6 +5,7 @@ export type UserProfile = {
   id: string;
   email: string;
   name: string;
+  bio: string;
   avatarUrl: string | null;
 };
 
@@ -14,11 +15,13 @@ function mapAuthUser(
   user: FirebaseAuthTypes.User,
   name?: string,
   avatarUrl: string | null = null,
+  bio = "",
 ): UserProfile {
   return {
     id: user.uid,
     email: user.email ?? "",
     name: name ?? user.displayName ?? "",
+    bio,
     avatarUrl,
   };
 }
@@ -56,6 +59,7 @@ export async function fetchUserProfile(uid: string): Promise<UserProfile | null>
     id: uid,
     email: data?.email ?? "",
     name: data?.name ?? "",
+    bio: data?.bio ?? "",
     avatarUrl: data?.avatarUrl ?? null,
   };
 }
@@ -75,6 +79,7 @@ export async function registerWithProfile(
     await firestore().collection(USERS).doc(userId).set({
       name,
       email,
+      bio: "",
       createdAt: firestore.FieldValue.serverTimestamp(),
       avatarUrl: null,
     });
@@ -105,6 +110,17 @@ export async function updateUserAvatarUrl(
   avatarUrl: string,
 ): Promise<void> {
   await firestore().collection(USERS).doc(uid).update({ avatarUrl });
+}
+
+export async function updateUserProfile(
+  uid: string,
+  data: { avatarUrl?: string; bio?: string },
+): Promise<void> {
+  const patch: Record<string, string> = {};
+  if (data.avatarUrl !== undefined) patch.avatarUrl = data.avatarUrl;
+  if (data.bio !== undefined) patch.bio = data.bio;
+  if (Object.keys(patch).length === 0) return;
+  await firestore().collection(USERS).doc(uid).update(patch);
 }
 
 export function mapFirebaseUser(user: FirebaseAuthTypes.User): UserProfile {

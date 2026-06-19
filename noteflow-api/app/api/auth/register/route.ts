@@ -37,11 +37,12 @@ export async function POST(request: Request) {
       id: string;
       email: string;
       name: string;
+      bio: string;
       avatar_url: string | null;
     }>(
       `INSERT INTO users (email, password_hash, name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, name, avatar_url`,
+       RETURNING id, email, name, bio, avatar_url`,
       [email.toLowerCase(), passwordHash, name],
     );
 
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
           id: user.id,
           email: user.email,
           name: user.name,
+          bio: user.bio ?? "",
           avatarUrl: user.avatar_url,
         },
       },

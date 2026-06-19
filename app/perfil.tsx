@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   Alert,
@@ -17,7 +18,7 @@ import { PageTransition } from "../components/PageTransition";
 import { useAuthStore } from "../store/authStore";
 import { useThemeColors } from "../hooks/useTheme";
 import { spacing, radius, typography } from "../constants/theme";
-import { updateUserAvatarUrl } from "../lib/firebaseAuth";
+import { updateUserProfile } from "../lib/firebaseAuth";
 import * as api from "../lib/api";
 import { TAB_ROUTES } from "../utils/routes";
 
@@ -28,32 +29,48 @@ export default function ProfileScreen() {
   const setSession = useAuthStore((s) => s.setSession);
   const logout = useAuthStore((s) => s.logout);
   const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
+  const [bio, setBio] = useState(user?.bio ?? "");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setBio(user?.bio ?? "");
+  }, [user?.bio]);
 
   const savedAvatarUrl = user?.avatarUrl ?? null;
   const displayAvatarUrl = pendingAvatarUrl ?? savedAvatarUrl;
-  const hasChanges =
+  const avatarChanged =
     pendingAvatarUrl !== null && pendingAvatarUrl !== savedAvatarUrl;
+  const bioChanged = bio.trim() !== (user?.bio ?? "");
+  const hasChanges = avatarChanged || bioChanged;
 
   const handleAvatarUploaded = (publicUrl: string) => {
     setPendingAvatarUrl(publicUrl);
   };
 
   const handleSave = async () => {
-    if (!user || !hasChanges || !pendingAvatarUrl) return;
+    if (!user || !hasChanges) return;
     setSaving(true);
     try {
+      const patch: { avatarUrl?: string; bio?: string } = {};
+      if (avatarChanged && pendingAvatarUrl) patch.avatarUrl = pendingAvatarUrl;
+      if (bioChanged) patch.bio = bio.trim();
+
       if (Platform.OS === "web") {
-        const updated = await api.updateAvatarUrl(pendingAvatarUrl);
+        const updated = await api.updateProfile(patch);
         await setSession({
           id: updated.id,
           email: updated.email,
           name: updated.name,
+          bio: updated.bio ?? "",
           avatarUrl: updated.avatarUrl ?? null,
         });
       } else {
-        await updateUserAvatarUrl(user.id, pendingAvatarUrl);
-        await setSession({ ...user, avatarUrl: pendingAvatarUrl });
+        await updateUserProfile(user.id, patch);
+        await setSession({
+          ...user,
+          bio: patch.bio ?? user.bio,
+          avatarUrl: patch.avatarUrl ?? user.avatarUrl,
+        });
       }
       setPendingAvatarUrl(null);
       Alert.alert("Listo", "Cambios guardados");
@@ -128,6 +145,27 @@ export default function ProfileScreen() {
             {user?.email}
           </Text>
 
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Biografía
+          </Text>
+          <TextInput
+            style={[
+              styles.bioInput,
+              {
+                color: colors.textPrimary,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+            ]}
+            placeholder="Cuéntanos algo sobre ti..."
+            placeholderTextColor={colors.textTertiary}
+            value={bio}
+            onChangeText={setBio}
+            multiline
+            maxLength={500}
+            textAlignVertical="top"
+          />
+
           <ImageAttachButton
             label="Cambiar foto de perfil"
             folder="avatars"
@@ -188,7 +226,7 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.h2 },
   card: {
-    alignItems: "center",
+    alignItems: "stretch",
     gap: spacing.md,
     padding: spacing.xl,
     borderRadius: radius.lg,
@@ -201,11 +239,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    alignSelf: "center",
   },
   avatar: { width: 120, height: 120 },
   avatarInitial: { fontSize: 40, fontWeight: "700" },
-  name: { ...typography.h3 },
-  email: { ...typography.body },
+  name: { ...typography.h3, textAlign: "center" },
+  email: { ...typography.body, textAlign: "center", marginBottom: spacing.sm },
+  label: { ...typography.caption, fontWeight: "600" },
+  bioInput: {
+    minHeight: 96,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 15,
+    lineHeight: 22,
+  },
   actionButton: {
     width: "100%",
     borderRadius: radius.md,

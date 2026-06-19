@@ -52,9 +52,14 @@ function mapApiUser(user: {
   id: string;
   email: string;
   name: string;
+  bio?: string;
   avatarUrl?: string | null;
 }): UserProfile {
-  return { ...user, avatarUrl: user.avatarUrl ?? null };
+  return {
+    ...user,
+    bio: user.bio ?? "",
+    avatarUrl: user.avatarUrl ?? null,
+  };
 }
 async function persistSession(user: UserProfile | null) {
   if (!user) {

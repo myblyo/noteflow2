@@ -118,7 +118,7 @@ Usa `expo-image` con:
 
 | Pantalla | Archivo | Acción |
 |----------|---------|--------|
-| Perfil | `app/perfil.tsx` | Cambiar foto → Firestore |
+| Perfil | `app/perfil.tsx` | Avatar + biografía → Firestore (móvil) o PostgreSQL (web) |
 | Nota | `app/nota/[id].tsx` | Adjuntar → PostgreSQL |
 
 ---

@@ -154,11 +154,13 @@ Asegúrate de tener `ANDROID_HOME` en el PATH y un emulador o dispositivo conect
 
 ## Documentación
 
+- [`docs/autenticacion-movil-firebase.md`](docs/autenticacion-movil-firebase.md) — Firebase Auth, Firestore, notas por usuario
+- [`docs/configuracion-aws-s3.md`](docs/configuracion-aws-s3.md) — conectar AWS S3 (bucket, IAM, variables)
+- [`docs/flujo-subida-imagenes-s3.md`](docs/flujo-subida-imagenes-s3.md) — diagrama subida de imágenes
 - [`noteflow-api/README.md`](noteflow-api/README.md) — endpoints REST, deploy en Vercel
 - [`docs/backend-teoria.md`](docs/backend-teoria.md) — arquitectura y modelo de datos
 - [`docs/seguridad-api.md`](docs/seguridad-api.md) — JWT, SQL injection, variables de entorno
 - [`docs/api-notes.md`](docs/api-notes.md) — ejemplos de respuestas de la API
-- [`docs/flujo-subida-imagenes-s3.md`](docs/flujo-subida-imagenes-s3.md) — adjuntos e imágenes
 
 ## Despliegue
 
