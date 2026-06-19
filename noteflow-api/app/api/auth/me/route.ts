@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 const patchSchema = z.object({
-  avatarUrl: z.string().url(),
+  avatarUrl: z.string().min(1, "URL de avatar requerida"),
 });
 
 export async function PATCH(request: Request) {

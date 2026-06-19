@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,10 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Pressable,
+  ActivityIndicator,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { BackButton } from "../components/BackButton";
 import { ImageAttachButton } from "../components/ImageAttachButton";
 import { RemoteImage } from "../components/RemoteImage";
@@ -20,19 +23,28 @@ import { TAB_ROUTES } from "../utils/routes";
 
 export default function ProfileScreen() {
   const colors = useThemeColors();
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const setSession = useAuthStore((s) => s.setSession);
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? null);
+  const logout = useAuthStore((s) => s.logout);
+  const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setAvatarUrl(user?.avatarUrl ?? null);
-  }, [user?.avatarUrl]);
+  const savedAvatarUrl = user?.avatarUrl ?? null;
+  const displayAvatarUrl = pendingAvatarUrl ?? savedAvatarUrl;
+  const hasChanges =
+    pendingAvatarUrl !== null && pendingAvatarUrl !== savedAvatarUrl;
 
-  const handleAvatarUploaded = async (publicUrl: string) => {
-    if (!user) return;
+  const handleAvatarUploaded = (publicUrl: string) => {
+    setPendingAvatarUrl(publicUrl);
+  };
+
+  const handleSave = async () => {
+    if (!user || !hasChanges || !pendingAvatarUrl) return;
+    setSaving(true);
     try {
       if (Platform.OS === "web") {
-        const updated = await api.updateAvatarUrl(publicUrl);
+        const updated = await api.updateAvatarUrl(pendingAvatarUrl);
         await setSession({
           id: updated.id,
           email: updated.email,
@@ -40,17 +52,44 @@ export default function ProfileScreen() {
           avatarUrl: updated.avatarUrl ?? null,
         });
       } else {
-        await updateUserAvatarUrl(user.id, publicUrl);
-        await setSession({ ...user, avatarUrl: publicUrl });
+        await updateUserAvatarUrl(user.id, pendingAvatarUrl);
+        await setSession({ ...user, avatarUrl: pendingAvatarUrl });
       }
-      setAvatarUrl(publicUrl);
-      Alert.alert("Listo", "Foto de perfil actualizada");
+      setPendingAvatarUrl(null);
+      Alert.alert("Listo", "Cambios guardados");
     } catch (error) {
       Alert.alert(
         "Error",
-        error instanceof Error ? error.message : "No se pudo guardar la foto",
+        error instanceof Error ? error.message : "No se pudieron guardar los cambios",
       );
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const performLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
+
+  const handleLogout = () => {
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.("¿Quieres salir de tu cuenta?")) {
+        void performLogout();
+      }
+      return;
+    }
+
+    Alert.alert("Cerrar sesión", "¿Quieres salir de tu cuenta?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Salir",
+        style: "destructive",
+        onPress: () => {
+          void performLogout();
+        },
+      },
+    ]);
   };
 
   return (
@@ -69,11 +108,11 @@ export default function ProfileScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.avatarWrap, { backgroundColor: colors.accentLight }]}>
-            {avatarUrl ? (
+            {displayAvatarUrl ? (
               <RemoteImage
-                uri={avatarUrl}
+                uri={displayAvatarUrl}
                 style={styles.avatar}
-                recyclingKey={avatarUrl}
+                recyclingKey={displayAvatarUrl}
               />
             ) : (
               <Text style={[styles.avatarInitial, { color: colors.accent }]}>
@@ -93,8 +132,46 @@ export default function ProfileScreen() {
             label="Cambiar foto de perfil"
             folder="avatars"
             onUploaded={handleAvatarUploaded}
-            variant="primary"
+            variant="secondary"
           />
+
+          <Pressable
+            style={[
+              styles.actionButton,
+              {
+                backgroundColor: hasChanges ? colors.accent : colors.surfaceSecondary,
+                opacity: hasChanges && !saving ? 1 : 0.55,
+              },
+            ]}
+            onPress={handleSave}
+            disabled={!hasChanges || saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  { color: hasChanges ? "#fff" : colors.textSecondary },
+                ]}
+              >
+                Guardar cambios
+              </Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.actionButton,
+              styles.logoutButton,
+              { borderColor: colors.error },
+            ]}
+            onPress={handleLogout}
+          >
+            <Text style={[styles.actionButtonText, { color: colors.error }]}>
+              Cerrar sesión
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </PageTransition>
@@ -129,4 +206,21 @@ const styles = StyleSheet.create({
   avatarInitial: { fontSize: 40, fontWeight: "700" },
   name: { ...typography.h3 },
   email: { ...typography.body },
+  actionButton: {
+    width: "100%",
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  logoutButton: {
+    backgroundColor: "transparent",
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: spacing.xs,
+  },
 });
